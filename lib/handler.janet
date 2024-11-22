@@ -140,7 +140,7 @@
          "lang" lang
          "req" id
          "sess" sess
-         "val" (string/format "%q" res)}))
+         "val" res}))
 
 
 (defn handle-env-load [req send send-err]
@@ -152,7 +152,7 @@
          "lang" lang
          "req" id
          "sess" sess
-         "val" (string/format "%q" res)}))
+         "val" res}))
 
 
 (defn handle-env-doc [req send send-err]
@@ -178,7 +178,10 @@
   (while t
     (each key (keys t)
       (if (and (<= slen (length key))
-               (= sym (slice key 0 slen)))
+               (= sym (case (type key)
+                        :symbol (symbol/slice key 0 slen)
+                        :keyword (keyword/slice key 0 slen)
+                        :string (string/slice key 0 slen))))
         (array/push matches key))
       (if (= max (length matches))
        (break)))
