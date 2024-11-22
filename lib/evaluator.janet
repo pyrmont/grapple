@@ -1,0 +1,84 @@
+# based on run-context
+(defn run [code &named env path parser req send send-err]
+  (var retval nil)
+
+  (def on-status debug/stacktrace)
+	(def on-compile-error bad-compile)
+	(def on-compile-warning warn-compile)
+	(def on-parse-error bad-parse)
+	(def evaluator (fn evaluate [x &] (x)))
+	(def where path)
+	(def guard :ydt)
+
+	# normally located outside run-context body
+	(def lint-levels
+		{:none 0
+		 :relaxed 1
+		 :normal 2
+		 :strict 3
+		 :all math/inf})
+
+	# Evaluate 1 source form in a protected manner
+	(def lints @[])
+	(defn eval1 [source &opt l c]
+		(var good true)
+		(var resumeval nil)
+		(def f
+			(fiber/new
+				(fn []
+					(array/clear lints)
+					(def res (compile source env where lints))
+					(unless (empty? lints)
+						# Convert lint levels to numbers.
+						(def levels (get env *lint-levels* lint-levels))
+						(def lint-error (get env *lint-error*))
+						(def lint-warning (get env *lint-warn*))
+						(def lint-error (or (get levels lint-error lint-error) 0))
+						(def lint-warning (or (get levels lint-warning lint-warning) 2))
+						(each [level line col msg] lints
+							(def lvl (get lint-levels level 0))
+							(cond
+								(<= lvl lint-error) (do
+																			(set good false)
+																			(on-compile-error msg nil where (or line l) (or col c)))
+								(<= lvl lint-warning) (on-compile-warning msg level where (or line l) (or col c)))))
+					(when good
+						(if (= (type res) :function)
+							(evaluator res source env where)
+							(do
+								(set good false)
+								(def {:error err :line line :column column :fiber errf} res)
+								(on-compile-error err errf where (or line l) (or column c))))))
+				guard
+				env))
+		(while (fiber/can-resume? f)
+			(def res (resume f resumeval))
+			(when good
+        (set retval res)
+        (set resumeval (on-status f res)))))
+
+	# Parse and evaluate
+	(def p-consume (parser :consume))
+	(def p-produce (parser :produce))
+	(def p-status (parser :status))
+	(def p-has-more (parser :has-more))
+	(parser/flush parser)
+	(var pindex 0)
+	(var pstatus nil)
+	(def len (length code))
+	(while (> len pindex)
+		(+= pindex (p-consume parser code pindex))
+		(while (p-has-more parser)
+			(def tup (p-produce parser true))
+			(eval1 ;[(in tup 0) ;(tuple/sourcemap tup)])
+			(if (env :exit) (break)))
+		(when (not= :root (p-status parser))
+			(def f (coro (on-parse-error parser where)))
+			(fiber/setenv f env)
+			(resume f)
+			(if (env :exit) (break))))
+
+	(put env :exit nil)
+  retval
+	# (in env :exit-value env)
+  )
