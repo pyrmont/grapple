@@ -36,14 +36,19 @@
   (def [recv send] (make-stream))
   (put h/sessions "1" true)
   (set h/sess-counter 1)
-  (h/handle {"op" "sess/new" "id" "1"} send)
+  (h/handle {"op" "sess/new"
+             "lang" h/lang
+             "id" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "sess/new"
+               "lang" h/lang
                "req" "1"
                "sess" "2"
-               "op" "sess/new"
                "val" {"arch" (string (os/arch))
-                      "lang" (string "janet/" janet/version)
+                      "impl" (string "janet/" janet/version)
+                      "lang" h/lang
                       "os" (string (os/which))
                       "ver" "mrepl/1"}})
   (is (== expect actual)))
@@ -51,12 +56,17 @@
 
 (deftest handle-sess-end
   (def [recv send] (make-stream))
-  (h/handle {"op" "sess/end" "id" "1" "sess" "1"} send)
+  (h/handle {"op" "sess/end"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "sess/end"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "sess/end"
                "val" "Session ended."})
   (is (== expect actual)))
 
@@ -65,26 +75,37 @@
   (def [recv send] (make-stream))
   (put h/sessions "1" true)
   (put h/sessions "2" true)
-  (h/handle {"op" "sess/list" "id" "1" "sess" "1"} send)
+  (h/handle {"op" "sess/list"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "sess/list"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "sess/list"
                "val" @["1" "2"]})
   (is (== expect actual)))
 
 
 (deftest handle-serv-info
   (def [recv send] (make-stream))
-  (h/handle {"op" "serv/info" "id" "1" "sess" "1"} send)
+  (h/handle {"op" "serv/info"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "serv/info"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "serv/info"
                "val" {"arch" (string (os/arch))
-                      "lang" (string "janet/" janet/version)
+                      "impl" (string "janet/" janet/version)
+                      "lang" h/lang
                       "os" (string (os/which))
                       "ver" "mrepl/1"}})
   (is (== expect actual)))
@@ -92,48 +113,70 @@
 
 (deftest handle-serv-stop
   (def [recv send] (make-stream))
-  (h/handle {"op" "serv/stop" "id" "1" "sess" "1"} send)
+  (h/handle {"op" "serv/stop"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "serv/stop"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "serv/stop"
                "val" "Server shutting down..."})
   (is (== expect actual)))
 
 
 (deftest handle-serv-relo
   (def [recv send] (make-stream))
-  (h/handle {"op" "serv/relo" "id" "1" "sess" "1"} send)
+  (h/handle {"op" "serv/relo"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "serv/relo"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "serv/relo"
                "val" "Server reloading..."})
   (is (== expect actual)))
 
 
 (deftest handle-env-eval
   (def [recv send] (make-stream))
-  (h/handle {"op" "env/eval" "id" "1" "sess" "1" "code" "(+ 1 2)"} send)
+  (h/handle {"op" "env/eval"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"
+             "code" "(+ 1 2)"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "env/eval"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "env/eval"
                "val" "3"})
   (is (== expect actual)))
 
 
 (deftest handle-env-load
   (def [recv send] (make-stream))
-  (h/handle {"op" "env/load" "id" "1" "sess" "1" "path" "test/resources/handler-env-load.txt"} send)
+  (h/handle {"op" "env/load"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"
+             "path" "test/resources/handler-env-load.txt"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "env/load"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "env/load"
                "val" "<function add-1>"})
   (is (== expect actual)))
 
@@ -141,12 +184,18 @@
 (deftest handle-env-doc
   (def [recv send] (make-stream))
   (put h/env 'x @{:doc "The number five." :value 5})
-  (h/handle {"op" "env/doc" "id" "1" "sess" "1" "sym" "x"} send)
+  (h/handle {"op" "env/doc"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"
+             "sym" "x"}
+            send)
   (def actual (recv))
   (def expect {"tag" "ret"
+               "op" "env/doc"
+               "lang" h/lang
                "req" "1"
                "sess" "1"
-               "op" "env/doc"
                "val" "\n\n    number\n\n    The number five.\n\n\n"})
   (is (== expect actual)))
 
