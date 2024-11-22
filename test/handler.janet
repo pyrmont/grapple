@@ -201,6 +201,26 @@
   (is (== expect actual)))
 
 
+(deftest handle-env-cmpl
+  (def [recv send] (make-stream))
+  (put h/env 'foo1 @{:value 1})
+  (put h/env 'foo2 @{:value 2})
+  (h/handle {"op" "env/cmpl"
+             "lang" h/lang
+             "id" "1"
+             "sess" "1"
+             "sym" "foo"}
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "env/cmpl"
+               "lang" h/lang
+               "req" "1"
+               "sess" "1"
+               "val" ['foo1 'foo2]})
+  (is (== expect actual)))
+
+
 (use-fixtures :each teardown)
 
 (run-tests!)

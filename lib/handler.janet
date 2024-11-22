@@ -1,6 +1,9 @@
 (import ./evaluator :as eval)
 
 (def lang "net.inqk/janet")
+(def match-max 20)
+
+
 (var env (make-env))
 (def sessions @{})
 (var sess-counter 0)
@@ -18,7 +21,7 @@
    "env/load" {:req ["lang" "id" "sess" "path"]}
    "env/stop" {:req ["lang" "id" "sess" "req"]}
    "env/doc" {:req ["lang" "id" "sess" "sym"]}
-   "env/compl" {:req ["lang" "id" "sess" "sym"]}})
+   "env/cmpl" {:req ["lang" "id" "sess" "sym"]}})
 
 
 (defn- make-sess []
@@ -167,13 +170,27 @@
 
 
 (defn handle-env-cmpl [req send send-err]
-  (def {"id" id "sess" sess} req)
+  (def {"id" id "sess" sess "sym" sym "max" user-max} req)
+  (def matches @[])
+  (def max (or user-max match-max))
+  (def slen (length sym))
+  (var t env)
+  (while t
+    (each key (keys t)
+      (if (and (<= slen (length key))
+               (= sym (slice key 0 slen)))
+        (array/push matches key))
+      (if (= max (length matches))
+       (break)))
+    (if (= max (length matches))
+      (set t nil)
+      (set t (table/getproto t))))
   (send {"tag" "ret"
          "op" "env/cmpl"
          "lang" lang
          "req" id
          "sess" sess
-         "val" nil}))
+         "val" matches}))
 
 
 (defn handle [req send]
@@ -196,7 +213,7 @@
         "serv/relo" (handle-serv-relo req send send-err)
         "env/eval" (handle-env-eval req send send-err)
         "env/load" (handle-env-load req send send-err)
-        "env/stop" (send-err :to req :msg "unsupported operation")
+        "env/stop" (send-err :to req :msg "operation not implemented")
         "env/doc" (handle-env-doc req send send-err)
         "env/cmpl" (handle-env-cmpl req send send-err))
       true)
