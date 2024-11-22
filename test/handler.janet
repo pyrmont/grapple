@@ -196,7 +196,8 @@
                "lang" h/lang
                "req" "1"
                "sess" "1"
-               "val" "\n\n    number\n\n    The number five.\n\n\n"})
+               "val" "The number five."
+               "janet/type" "number"})
   (is (== expect actual)))
 
 

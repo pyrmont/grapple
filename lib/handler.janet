@@ -155,13 +155,15 @@
 (defn handle-env-doc [req send send-err]
   (def {"id" id "sess" sess "sym" sym} req)
   (def buf @"")
-  (resume (fiber/new (fn [] (setdyn :out buf) (doc* (symbol sym))) : env))
+  (def bind (env (symbol sym)))
   (send {"tag" "ret"
          "op" "env/doc"
          "lang" lang
          "req" id
          "sess" sess
-         "val" (string buf)}))
+         "val" (bind :doc)
+         "janet/type" (string (type (bind :value)))
+         "janet/sm" (bind :source-map)}))
 
 
 (defn handle-env-cmpl [req send send-err]
