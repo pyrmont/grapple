@@ -159,7 +159,7 @@
                "lang" h/lang
                "req" "1"
                "sess" "1"
-               "val" 3})
+               "val" "3"})
   (is (== expect actual)))
 
 
@@ -177,7 +177,7 @@
                "lang" h/lang
                "req" "1"
                "sess" "1"
-               "val" 1})
+               "val" "1"})
   (is (== expect actual)))
 
 
@@ -209,7 +209,8 @@
              "lang" h/lang
              "id" "1"
              "sess" "1"
-             "sym" 'foo}
+             "sym" "foo"
+             "janet/type" "symbol"}
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -217,7 +218,7 @@
                "lang" h/lang
                "req" "1"
                "sess" "1"
-               "val" ['foo1 'foo2]})
+               "val" ["foo1" "foo2"]})
   (is (== expect actual)))
 
 

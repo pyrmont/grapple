@@ -59,6 +59,10 @@
    "arch" (string (os/arch))})
 
 
+(defn- literalise [x]
+  (string/format "%q" x))
+
+
 (defn confirm [req &named has else]
   (each k has
     (unless (req k)
@@ -140,7 +144,7 @@
          "lang" lang
          "req" id
          "sess" sess
-         "val" res}))
+         "val" (literalise res)}))
 
 
 (defn handle-env-load [req send send-err]
@@ -152,7 +156,7 @@
          "lang" lang
          "req" id
          "sess" sess
-         "val" res}))
+         "val" (literalise res)}))
 
 
 (defn handle-env-doc [req send send-err]
@@ -170,7 +174,15 @@
 
 
 (defn handle-env-cmpl [req send send-err]
-  (def {"id" id "sess" sess "sym" sym "max" user-max} req)
+  (def {"id" id
+        "sess" sess
+        "sym" sym-str
+        "max" user-max
+        "janet/type" sym_t} req)
+  (def sym (case sym_t
+             "symbol" (symbol sym-str)
+             "keyword" (keyword sym-str)
+             sym-str))
   (def matches @[])
   (def max (or user-max match-max))
   (def slen (length sym))
@@ -182,7 +194,7 @@
                         :symbol (symbol/slice key 0 slen)
                         :keyword (keyword/slice key 0 slen)
                         :string (string/slice key 0 slen))))
-        (array/push matches key))
+        (array/push matches (string key)))
       (if (= max (length matches))
        (break)))
     (if (= max (length matches))
