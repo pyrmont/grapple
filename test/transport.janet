@@ -1,15 +1,23 @@
 (import /deps/testament/src/testament :prefix "" :exit true)
+(import ../deps/medea/medea :as json)
 (import ../lib/transport :as t)
+
+
+(def msg {"tag" "a-tag"
+          "val" "\"1\""})
 
 
 (deftest receive-succeed
   (def [r w] (os/pipe))
-  (def data "\x15\0\0\0{\"id\":1,\"tag\":\"done\"}")
-  (:write w data)
+  (def payload (json/encode msg))
+  (def buf @"")
+  (buffer/push-word buf (length payload))
+  (buffer/push-string buf payload)
+  (:write w buf)
   (:close w)
   (def recv (t/make-recv r))
   (def actual (recv))
-  (def expect {"tag" "done" "id" 1})
+  (def expect {"tag" "a-tag" "val" "\"1\""})
   (is (== expect actual)))
 
 
@@ -33,13 +41,11 @@
 
 (deftest send-succeed
   (def [r w] (os/pipe))
-  (def msg {"tag" "done" "id" 1})
   (def send (t/make-send w))
   (send msg)
   (:close w)
   (def actual (:read r :all))
-  # set up expected value
-  (def payload "{\"id\":1,\"tag\":\"done\"}")
+  (def payload (json/encode msg))
   (def expect (-> @""
                   (buffer/push-word (length payload))
                   (buffer/push-string payload)))
@@ -48,7 +54,6 @@
 
 (deftest send-fail
   (def [r w] (os/pipe))
-  (def msg {"tag" "done" "id" 1})
   (def send (t/make-send w))
   (:close w)
   (assert-thrown-message "stream is closed" (send msg)))
