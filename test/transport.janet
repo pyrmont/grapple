@@ -4,7 +4,7 @@
 
 
 (def msg {"tag" "a-tag"
-          "val" "\"1\""})
+          "val" "a-value"})
 
 
 (deftest receive-succeed
@@ -17,7 +17,7 @@
   (:close w)
   (def recv (t/make-recv r))
   (def actual (recv))
-  (def expect {"tag" "a-tag" "val" "\"1\""})
+  (def expect {"tag" "a-tag" "val" "a-value"})
   (is (== expect actual)))
 
 
