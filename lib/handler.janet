@@ -1,13 +1,11 @@
+(import ./utilities :as util)
 (import ./evaluator :as eval)
-
-(def lang "net.inqk/janet")
-(def match-max 20)
 
 
 (var env (make-env))
 (def sessions @{})
 (var sess-counter 0)
-(def sentinel @"")
+(def match-max 20)
 
 
 (def ops
@@ -35,25 +33,25 @@
   (put sessions sess-id nil))
 
 
-(defn- make-send-err [send]
-  (fn sender [&named to msg src line col st]
-    (def {"op" op "id" id "sess" sess} to)
-    (send {"tag" "err"
-           "op" op
-           "lang" lang
-           "req" id
-           "sess" sess
-           "msg" msg
-           "src" src
-           "line" line
-           "col" col
-           "st" st})
-    (error sentinel)))
+# (defn- make-send-err [send]
+#   (fn sender [&named to msg src line col st]
+#     (def {"op" op "id" id "sess" sess} to)
+#     (send {"tag" "err"
+#            "op" op
+#            "lang" util/lang
+#            "req" id
+#            "sess" sess
+#            "msg" msg
+#            "src" src
+#            "line" line
+#            "col" col
+#            "st" st})
+#     (error sentinel)))
 
 
 (defn- info-msg []
   {"ver" "mrepl/1"
-   "lang" lang
+   "lang" util/lang
    "impl" (string "janet/" janet/version)
    "os" (string (os/which))
    "arch" (string (os/arch))})
@@ -76,7 +74,7 @@
     (send-err :to req :msg "failed to start session"))
   (send {"tag" "ret"
          "op" "sess/new"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (info-msg)}))
@@ -87,7 +85,7 @@
   (end-sess sess)
   (send {"tag" "ret"
          "op" "sess/end"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" "Session ended."}))
@@ -97,7 +95,7 @@
   (def {"id" id "sess" sess} req)
   (send {"tag" "ret"
          "op" "sess/list"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (keys sessions)}))
@@ -107,7 +105,7 @@
   (def {"id" id "sess" sess} req)
   (send {"tag" "ret"
          "op" "serv/info"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (info-msg)}))
@@ -118,7 +116,7 @@
   (def {"id" id "sess" sess} req)
   (send {"tag" "ret"
          "op" "serv/stop"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" "Server shutting down..."}))
@@ -129,7 +127,7 @@
   (def {"id" id "sess" sess} req)
   (send {"tag" "ret"
          "op" "serv/relo"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" "Server reloading..."}))
@@ -137,11 +135,15 @@
 
 (defn handle-env-eval [req send send-err]
   (def {"id" id "sess" sess "code" code "path" path} req)
-  (def p (parser/new))
-  (def res (eval/run code :env env :path path :parser p :req req :send send :send-err send-err))
+  (def res (eval/run code
+                     :env env
+                     :path path
+                     :out-1 (util/make-send-out send req "out")
+                     :out-2 (util/make-send-out send req "err")
+                     :err send-err))
   (send {"tag" "ret"
          "op" "env/eval"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (literalise res)}))
@@ -149,11 +151,16 @@
 
 (defn handle-env-load [req send send-err]
   (def {"id" id "sess" sess "path" path} req)
-  (def p (parser/new))
-  (def res (eval/run (slurp path) :env env :path path :parser p :req req :send send :send-err send-err))
+  (def code (slurp path))
+  (def res (eval/run code
+                     :env env
+                     :path path
+                     :out-1 (util/make-send-out send req "out")
+                     :out-2 (util/make-send-out send req "err")
+                     :err send-err))
   (send {"tag" "ret"
          "op" "env/load"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (literalise res)}))
@@ -165,7 +172,7 @@
   (def bind (env (symbol sym)))
   (send {"tag" "ret"
          "op" "env/doc"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" (bind :doc)
@@ -202,14 +209,14 @@
       (set t (table/getproto t))))
   (send {"tag" "ret"
          "op" "env/cmpl"
-         "lang" lang
+         "lang" util/lang
          "req" id
          "sess" sess
          "val" matches}))
 
 
 (defn handle [req send]
-  (def send-err (make-send-err send))
+  (def send-err (util/make-send-err send req))
   (try
     (do
       (def op (req "op"))
@@ -217,7 +224,7 @@
       (unless spec
         (send-err :to req :msg "unsupported operation"))
       (confirm req :has (spec :req) :else send-err)
-      (unless (= lang (req "lang"))
+      (unless (= util/lang (req "lang"))
         (send-err :to req :msg "unsupported language version"))
       (case op
         "sess/new" (handle-sess-new req send send-err)
@@ -233,6 +240,6 @@
         "env/cmpl" (handle-env-cmpl req send send-err))
       true)
     ([e fib]
-     (if (= sentinel e)
+     (if (= util/err-sentinel e)
        false
        (propagate e fib)))))

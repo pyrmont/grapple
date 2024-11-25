@@ -1,5 +1,5 @@
 # based on run-context
-(defn run [code &named env path parser req send send-err]
+(defn run [code &named env path out-1 out-2 err]
   (var retval nil)
 
   (def on-status debug/stacktrace)
@@ -7,7 +7,7 @@
 	(def on-compile-warning warn-compile)
 	(def on-parse-error bad-parse)
 	(def evaluator (fn evaluate [x &] (x)))
-	(def where path)
+	(def where (or path :<mrepl>))
 	(def guard :ydt)
 
 	# normally located outside run-context body
@@ -26,6 +26,8 @@
 		(def f
 			(fiber/new
 				(fn []
+          (setdyn :out out-1)
+          (setdyn :err out-2)
 					(array/clear lints)
 					(def res (compile source env where lints))
 					(unless (empty? lints)
@@ -57,26 +59,41 @@
         (set retval res)
         (set resumeval (on-status f res)))))
 
+  # Handle parser error in the correct environment
+  (defn parse-err [p where]
+    (def f (coro
+             (setdyn :err err)
+             (on-parse-error p where)))
+    (fiber/setenv f env)
+    (resume f))
+
+  (defn prod-and-eval [p]
+    (def tup (parser/produce p true))
+    (eval1 (in tup 0) ;(tuple/sourcemap tup)))
+
 	# Parse and evaluate
-	(def p-consume (parser :consume))
-	(def p-produce (parser :produce))
-	(def p-status (parser :status))
-	(def p-has-more (parser :has-more))
-	(parser/flush parser)
+  (def p (parser/new))
 	(var pindex 0)
 	(var pstatus nil)
 	(def len (length code))
+  (if (= len 0) (parser/eof p))
 	(while (> len pindex)
-		(+= pindex (p-consume parser code pindex))
-		(while (p-has-more parser)
-			(def tup (p-produce parser true))
-			(eval1 ;[(in tup 0) ;(tuple/sourcemap tup)])
+		(+= pindex (parser/consume p code pindex))
+		(while (parser/has-more p)
+      (prod-and-eval p)
 			(if (env :exit) (break)))
-		(when (not= :root (p-status parser))
-			(def f (coro (on-parse-error parser where)))
-			(fiber/setenv f env)
-			(resume f)
+		(when (= :error (parser/status p))
+      (parse-err p where)
 			(if (env :exit) (break))))
+
+  # Check final parser state
+  (unless (env :exit)
+    (parser/eof p)
+    (while (parser/has-more p)
+      (prod-and-eval p)
+      (if (env :exit) (break)))
+    (when (= :error (parser/status p))
+      (parse-err p where)))
 
 	(put env :exit nil)
   retval
