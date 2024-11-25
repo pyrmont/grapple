@@ -13,11 +13,11 @@
    chan])
 
 
-(defn make-sends [send req]
-  [(u/make-send-ret send req)
-   (u/make-send-out send req "out")
-   (u/make-send-out send req "err")
-   (u/make-send-err send req)])
+(defn make-sends [req send]
+  [(u/make-send-ret req send)
+   (u/make-send-out req send "out")
+   (u/make-send-out req send "err")
+   (u/make-send-err req send)])
 
 
 # Generic eval request
@@ -31,19 +31,11 @@
 
 # Tests
 
-(deftest run-succeed-result
+(deftest run-succeed-calculation
   (def [recv send chan] (make-stream))
   (def env (make-env))
-  (def parser (parser/new))
-  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
   (def actual-1
-    (e/run "(+ 1 2)"
-           :env env
-           :parser parser
-           :ret send-ret
-           :out-1 send-out-1
-           :out-2 send-out-2
-           :err send-err))
+    (e/run "(+ 1 2)" :env env :send send :req req))
   (is (nil? actual-1))
   (def actual-2 (recv))
   (def expect-2
@@ -58,19 +50,11 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest run-succeed-print
+(deftest run-succeed-output
   (def [recv send chan] (make-stream))
   (def env (make-env))
-  (def parser (parser/new))
-  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
   (def actual-1
-    (e/run "(print \"Hello world\")"
-           :env env
-           :parser parser
-           :ret send-ret
-           :out-1 send-out-1
-           :out-2 send-out-2
-           :err send-err))
+    (e/run "(print \"Hello world\")" :env env :send send :req req))
   (is (nil? actual-1))
   (def actual-2 (recv))
   (def expect-2
@@ -95,19 +79,11 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest run-fail-incomplete
+(deftest run-fail-parser
   (def [recv send chan] (make-stream))
   (def env (make-env))
-  (def parser (parser/new))
-  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
   (def actual-1
-    (e/run "(print \"Hello world\""
-             :env env
-             :parser parser
-             :ret send-ret
-             :out-1 send-out-1
-             :out-2 send-out-2
-             :err send-err))
+    (e/run "(print \"Hello world\"" :env env :send send :req req))
   (is (nil? actual-1))
   (def actual-2 (recv))
   (def expect-msg
@@ -117,11 +93,52 @@
                "lang" u/lang
                "req" "1"
                "sess" "1"
-               "done" false
                "msg" expect-msg
                "janet/path" :<mrepl>
                "janet/col" 20
                "janet/line" 1})
+  (is (== expect actual-2))
+  (is (zero? (ev/count chan))))
+
+
+(deftest run-fail-compiler
+  (def [recv send chan] (make-stream))
+  (def env (make-env))
+  (def actual-1
+    (e/run "(foo)" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-msg
+    "compile error: unknown symbol foo")
+  (def expect {"tag" "err"
+               "op" "env/eval"
+               "lang" u/lang
+               "req" "1"
+               "sess" "1"
+               "msg" expect-msg
+               "janet/path" :<mrepl>
+               "janet/col" 1
+               "janet/line" 1})
+  (is (== expect actual-2))
+  (is (zero? (ev/count chan))))
+
+
+(deftest run-fail-runtime
+  (def [recv send chan] (make-stream))
+  (def env (make-env))
+  (def actual-1
+    (e/run "(+ 1 nil)" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-msg
+    "error: could not find method :+ for 1 or :r+ for nil")
+  (def expect {"tag" "err"
+               "op" "env/eval"
+               "lang" u/lang
+               "req" "1"
+               "sess" "1"
+               "msg" expect-msg
+               "janet/stack" (actual-2 "janet/stack")})
   (is (== expect actual-2))
   (is (zero? (ev/count chan))))
 

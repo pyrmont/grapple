@@ -52,7 +52,6 @@
 # Handle functions
 
 (defn handle-sess-new [req send-ret send-err]
-  (def id (req "id"))
   (def sess (make-sess))
   (unless sess
     (send-err "failed to start session"))
@@ -60,70 +59,64 @@
 
 
 (defn handle-sess-end [req send-ret send-err]
-  (def {"id" id "sess" sess} req)
+  (def sess (req "sess"))
   (end-sess sess)
   (send-ret "Session ended."))
 
 
 (defn handle-sess-list [req send-ret send-err]
-  (def {"id" id "sess" sess} req)
   (send-ret (keys sessions)))
 
 
 (defn handle-serv-info [req send-ret send-err]
-  (def {"id" id "sess" sess} req)
   (send-ret (info-msg)))
 
 
 # TODO: implement
 (defn handle-serv-stop [req send-ret send-err]
-  (def {"id" id "sess" sess} req)
   (send-ret "Server shutting down..."))
 
 
 # TODO: implement
 (defn handle-serv-relo [req send-ret send-err]
-  (def {"id" id "sess" sess} req)
   (send-ret "Server reloading..."))
 
 
 (defn handle-env-eval [req send-ret send-err send]
-  (def {"id" id "sess" sess "code" code "path" path} req)
+  (def {"code" code "path" path} req)
   (def res (eval/run code
                      :env env
                      :path path
-                     :ret send-ret
-                     :out-1 (util/make-send-out send req "out")
-                     :out-2 (util/make-send-out send req "err")
-                     :err send-err))
-  (send-ret nil))
+                     :send send
+                     :req req))
+  (send-ret res))
 
 
 (defn handle-env-load [req send-ret send-err send]
-  (def {"id" id "sess" sess "path" path} req)
+  (def {"path" path} req)
   (def code (slurp path))
   (def res (eval/run code
                      :env env
                      :path path
-                     :ret send-ret
-                     :out-1 (util/make-send-out send req "out")
-                     :out-2 (util/make-send-out send req "err")
-                     :err send-err))
-  (send-ret nil))
+                     :send send
+                     :req req))
+  (send-ret res))
 
 
 (defn handle-env-doc [req send-ret send-err]
-  (def {"id" id "sess" sess "sym" sym} req)
-  (def buf @"")
-  (def bind (env (symbol sym)))
+  (def {"sym" sym-str
+        "janet/type" sym_t} req)
+  (def sym (case sym_t
+             "symbol" (symbol sym-str)
+             "keyword" (keyword sym-str)
+             sym-str))
+  (def bind (env sym))
   (send-ret (bind :doc) {"janet/type" (string (type (bind :value)))
                          "janet/sm" (bind :source-map)}))
 
 
 (defn handle-env-cmpl [req send-ret send-err]
-  (def {"id" id
-        "sess" sess
-        "sym" sym-str
+  (def {"sym" sym-str
         "max" user-max
         "janet/type" sym_t} req)
   (def sym (case sym_t
@@ -151,8 +144,8 @@
 
 
 (defn handle [req send]
-  (def send-ret (util/make-send-ret send req))
-  (def send-err (util/make-send-err send req))
+  (def send-ret (util/make-send-ret req send))
+  (def send-err (util/make-send-err req send))
   (do
     (def op (req "op"))
     (def spec (ops op))

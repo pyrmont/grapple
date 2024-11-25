@@ -4,33 +4,56 @@
 (defn bad-compile [send-err]
   (fn :bad-compile [msg macrof where &opt line col]
     (def full-msg (string "compile error: " msg))
-    (def details {"done" false
-                  "janet/path" where
+    (def details {"janet/path" where
                   "janet/line" line
                   "janet/col" col})
     (send-err full-msg details)))
-
-
-(defn warn-compile [send-err]
-  )
 
 
 (defn bad-parse [send-err]
   (fn :bad-parse [p where]
     (def [line col] (parser/where p))
     (def full-msg (string "parse error: " (parser/error p)))
-    (def details {"done" false
-                  "janet/path" where
+    (def details {"janet/path" where
                   "janet/line" line
                   "janet/col" col})
     (send-err full-msg details)))
 
 
+(defn debugger-on-status [env level send-ret send-err]
+  (fn :debugger [f x]
+    (def fs (fiber/status f))
+    (if (= :dead fs)
+      (do
+        (put env '_ @{:value x})
+        (send-ret (util/literalise x) {"done" false}))
+      (do
+        (send-err (string (fiber/status f) ": " x)
+                  {"janet/stack" (debug/stack f)})
+        # (if (get env :debug) (debugger f level))
+        ))))
+
+
+(defn warn-compile [send-note]
+  (fn :warn-compile [msg level where &opt line col]
+    (def full-msg (string "compile warning (" level "): " msg))
+    (def details {"janet/path" where
+                  "janet/line" line
+                  "janet/col" col})
+    (send-note full-msg details)))
+
+
 # based on run-context
-(defn run [code &named env path ret out-1 out-2 err]
-  (def on-status debug/stacktrace)
-  (def on-compile-error bad-compile)
-  (def on-compile-warning warn-compile)
+(defn run [code &named env path req send]
+  (def err (util/make-send-err req send))
+  (def note (util/make-send-note req send))
+  (def out-1 (util/make-send-out req send "out"))
+  (def out-2 (util/make-send-out req send "err"))
+  (def ret (util/make-send-ret req send))
+
+  (def on-status (debugger-on-status env 1 ret err))
+  (def on-compile-error (bad-compile err))
+  (def on-compile-warning (warn-compile note))
   (def on-parse-error (bad-parse err))
   (def evaluator (fn evaluate [x &] (x)))
   (def where (or path :<mrepl>))
@@ -81,9 +104,7 @@
         env))
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
-      (when good
-        (ret (util/literalise res) {"done" false})
-        (set resumeval (on-status f res)))))
+      (when good (set resumeval (on-status f res)))))
 
   # Handle parser error in the correct environment
   (defn parse-err [p where]
