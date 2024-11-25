@@ -22,31 +22,12 @@
    "env/cmpl" {:req ["lang" "id" "sess" "sym"]}})
 
 
-(defn- make-sess []
-  (set sess-counter (inc sess-counter))
-  (def sess-id (string sess-counter))
-  (put sessions sess-id true)
-  sess-id)
-
-
-(defn- end-sess [sess-id]
-  (put sessions sess-id nil))
-
-
-# (defn- make-send-err [send]
-#   (fn sender [&named to msg src line col st]
-#     (def {"op" op "id" id "sess" sess} to)
-#     (send {"tag" "err"
-#            "op" op
-#            "lang" util/lang
-#            "req" id
-#            "sess" sess
-#            "msg" msg
-#            "src" src
-#            "line" line
-#            "col" col
-#            "st" st})
-#     (error sentinel)))
+(defn confirm [req ks send-err]
+  (each k ks
+    (unless (req k)
+      (send-err (string "request missing key \"" k "\""))
+      (break false)))
+  true)
 
 
 (defn- info-msg []
@@ -57,130 +38,89 @@
    "arch" (string (os/arch))})
 
 
-(defn- literalise [x]
-  (string/format "%q" x))
+(defn- end-sess [sess-id]
+  (put sessions sess-id nil))
 
 
-(defn confirm [req &named has else]
-  (each k has
-    (unless (req k)
-      (else :to req :msg (string "request missing key \"" k "\"")))))
+(defn- make-sess []
+  (set sess-counter (inc sess-counter))
+  (def sess-id (string sess-counter))
+  (put sessions sess-id true)
+  sess-id)
 
 
-(defn handle-sess-new [req send send-err]
+# Handle functions
+
+(defn handle-sess-new [req send-ret send-err]
   (def id (req "id"))
   (def sess (make-sess))
   (unless sess
-    (send-err :to req :msg "failed to start session"))
-  (send {"tag" "ret"
-         "op" "sess/new"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (info-msg)}))
+    (send-err "failed to start session"))
+  (send-ret (info-msg) {"sess" sess}))
 
 
-(defn handle-sess-end [req send send-err]
+(defn handle-sess-end [req send-ret send-err]
   (def {"id" id "sess" sess} req)
   (end-sess sess)
-  (send {"tag" "ret"
-         "op" "sess/end"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" "Session ended."}))
+  (send-ret "Session ended."))
 
 
-(defn handle-sess-list [req send send-err]
+(defn handle-sess-list [req send-ret send-err]
   (def {"id" id "sess" sess} req)
-  (send {"tag" "ret"
-         "op" "sess/list"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (keys sessions)}))
+  (send-ret (keys sessions)))
 
 
-(defn handle-serv-info [req send send-err]
+(defn handle-serv-info [req send-ret send-err]
   (def {"id" id "sess" sess} req)
-  (send {"tag" "ret"
-         "op" "serv/info"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (info-msg)}))
+  (send-ret (info-msg)))
 
 
 # TODO: implement
-(defn handle-serv-stop [req send send-err]
+(defn handle-serv-stop [req send-ret send-err]
   (def {"id" id "sess" sess} req)
-  (send {"tag" "ret"
-         "op" "serv/stop"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" "Server shutting down..."}))
+  (send-ret "Server shutting down..."))
 
 
 # TODO: implement
-(defn handle-serv-relo [req send send-err]
+(defn handle-serv-relo [req send-ret send-err]
   (def {"id" id "sess" sess} req)
-  (send {"tag" "ret"
-         "op" "serv/relo"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" "Server reloading..."}))
+  (send-ret "Server reloading..."))
 
 
-(defn handle-env-eval [req send send-err]
+(defn handle-env-eval [req send-ret send-err send]
   (def {"id" id "sess" sess "code" code "path" path} req)
   (def res (eval/run code
                      :env env
                      :path path
+                     :ret send-ret
                      :out-1 (util/make-send-out send req "out")
                      :out-2 (util/make-send-out send req "err")
                      :err send-err))
-  (send {"tag" "ret"
-         "op" "env/eval"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (literalise res)}))
+  (send-ret nil))
 
 
-(defn handle-env-load [req send send-err]
+(defn handle-env-load [req send-ret send-err send]
   (def {"id" id "sess" sess "path" path} req)
   (def code (slurp path))
   (def res (eval/run code
                      :env env
                      :path path
+                     :ret send-ret
                      :out-1 (util/make-send-out send req "out")
                      :out-2 (util/make-send-out send req "err")
                      :err send-err))
-  (send {"tag" "ret"
-         "op" "env/load"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (literalise res)}))
+  (send-ret nil))
 
 
-(defn handle-env-doc [req send send-err]
+(defn handle-env-doc [req send-ret send-err]
   (def {"id" id "sess" sess "sym" sym} req)
   (def buf @"")
   (def bind (env (symbol sym)))
-  (send {"tag" "ret"
-         "op" "env/doc"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" (bind :doc)
-         "janet/type" (string (type (bind :value)))
-         "janet/sm" (bind :source-map)}))
+  (send-ret (bind :doc) {"janet/type" (string (type (bind :value)))
+                         "janet/sm" (bind :source-map)}))
 
 
-(defn handle-env-cmpl [req send send-err]
+(defn handle-env-cmpl [req send-ret send-err]
   (def {"id" id
         "sess" sess
         "sym" sym-str
@@ -207,39 +147,33 @@
     (if (= max (length matches))
       (set t nil)
       (set t (table/getproto t))))
-  (send {"tag" "ret"
-         "op" "env/cmpl"
-         "lang" util/lang
-         "req" id
-         "sess" sess
-         "val" matches}))
+  (send-ret matches))
 
 
 (defn handle [req send]
+  (def send-ret (util/make-send-ret send req))
   (def send-err (util/make-send-err send req))
-  (try
-    (do
-      (def op (req "op"))
-      (def spec (ops op))
-      (unless spec
-        (send-err :to req :msg "unsupported operation"))
-      (confirm req :has (spec :req) :else send-err)
-      (unless (= util/lang (req "lang"))
-        (send-err :to req :msg "unsupported language version"))
-      (case op
-        "sess/new" (handle-sess-new req send send-err)
-        "sess/end" (handle-sess-end req send send-err)
-        "sess/list" (handle-sess-list req send send-err)
-        "serv/info" (handle-serv-info req send send-err)
-        "serv/stop" (handle-serv-stop req send send-err)
-        "serv/relo" (handle-serv-relo req send send-err)
-        "env/eval" (handle-env-eval req send send-err)
-        "env/load" (handle-env-load req send send-err)
-        "env/stop" (send-err :to req :msg "operation not implemented")
-        "env/doc" (handle-env-doc req send send-err)
-        "env/cmpl" (handle-env-cmpl req send send-err))
-      true)
-    ([e fib]
-     (if (= util/err-sentinel e)
-       false
-       (propagate e fib)))))
+  (do
+    (def op (req "op"))
+    (def spec (ops op))
+    (unless spec
+      (send-err "unsupported operation")
+      (break false))
+    (unless (confirm req (spec :req) send-err)
+      (break false))
+    (unless (= util/lang (req "lang"))
+      (send-err "unsupported language version")
+      (break false))
+    (case op
+      "sess/new" (handle-sess-new req send-ret send-err)
+      "sess/end" (handle-sess-end req send-ret send-err)
+      "sess/list" (handle-sess-list req send-ret send-err)
+      "serv/info" (handle-serv-info req send-ret send-err)
+      "serv/stop" (handle-serv-stop req send-ret send-err)
+      "serv/relo" (handle-serv-relo req send-ret send-err)
+      "env/eval" (handle-env-eval req send-ret send-err send)
+      "env/load" (handle-env-load req send-ret send-err send)
+      "env/stop" (send-err "operation not implemented")
+      "env/doc" (handle-env-doc req send-ret send-err)
+      "env/cmpl" (handle-env-cmpl req send-ret send-err))
+    true))

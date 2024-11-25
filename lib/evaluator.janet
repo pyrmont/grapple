@@ -1,29 +1,33 @@
+(import ./utilities :as util)
+
+
 (defn bad-compile [send-err]
   (fn :bad-compile [msg macrof where &opt line col]
     (def full-msg (string "compile error: " msg))
-    (def details {"janet/path" where
+    (def details {"done" false
+                  "janet/path" where
                   "janet/line" line
                   "janet/col" col})
     (send-err full-msg details)))
 
 
-(defn warn-compile [send-err])
+(defn warn-compile [send-err]
+  )
 
 
 (defn bad-parse [send-err]
   (fn :bad-parse [p where]
     (def [line col] (parser/where p))
     (def full-msg (string "parse error: " (parser/error p)))
-    (def details {"janet/path" where
+    (def details {"done" false
+                  "janet/path" where
                   "janet/line" line
                   "janet/col" col})
     (send-err full-msg details)))
 
 
 # based on run-context
-(defn run [code &named env path out-1 out-2 err]
-  (var retval nil)
-
+(defn run [code &named env path ret out-1 out-2 err]
   (def on-status debug/stacktrace)
   (def on-compile-error bad-compile)
   (def on-compile-warning warn-compile)
@@ -78,7 +82,7 @@
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
       (when good
-        (set retval res)
+        (ret (util/literalise res) {"done" false})
         (set resumeval (on-status f res)))))
 
   # Handle parser error in the correct environment
@@ -117,6 +121,4 @@
       (parse-err p where)))
 
   (put env :exit nil)
-  retval
-  # (in env :exit-value env)
-  )
+  (in env :exit-value))

@@ -8,11 +8,14 @@
 
 (defn make-stream []
   (def chan (ev/chan 5))
-  [(fn [] (ev/take chan)) (fn [v] (ev/give chan v))])
+  [(fn [] (ev/take chan))
+   (fn [v] (ev/give chan v))
+   chan])
 
 
 (defn make-sends [send req]
-  [(u/make-send-out send req "out")
+  [(u/make-send-ret send req)
+   (u/make-send-out send req "out")
    (u/make-send-out send req "err")
    (u/make-send-err send req)])
 
@@ -29,35 +32,46 @@
 # Tests
 
 (deftest run-succeed-result
-  (def [recv send] (make-stream))
+  (def [recv send chan] (make-stream))
   (def env (make-env))
   (def parser (parser/new))
-  (def [send-out-1 send-out-2 send-err] (make-sends send req))
-  (def actual
+  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
+  (def actual-1
     (e/run "(+ 1 2)"
            :env env
            :parser parser
+           :ret send-ret
            :out-1 send-out-1
            :out-2 send-out-2
            :err send-err))
-  (def expect 3)
-  (is (== expect actual)))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-2
+    {"tag" "ret"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "done" false
+     "val" "3"})
+  (is (== expect-2 actual-2))
+  (is (zero? (ev/count chan))))
 
 
 (deftest run-succeed-print
-  (def [recv send] (make-stream))
+  (def [recv send chan] (make-stream))
   (def env (make-env))
   (def parser (parser/new))
-  (def [send-out-1 send-out-2 send-err] (make-sends send req))
+  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
   (def actual-1
     (e/run "(print \"Hello world\")"
            :env env
            :parser parser
+           :ret send-ret
            :out-1 send-out-1
            :out-2 send-out-2
            :err send-err))
-  (def expect-1 nil)
-  (is (== expect-1 actual-1))
+  (is (nil? actual-1))
   (def actual-2 (recv))
   (def expect-2
     {"tag" "out"
@@ -67,34 +81,49 @@
      "sess" "1"
      "ch" "out"
      "val" "Hello world\n"})
-  (is (== expect-2 actual-2)))
+  (is (== expect-2 actual-2))
+  (def actual-3 (recv))
+  (def expect-3
+    {"tag" "ret"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "done" false
+     "val" "nil"})
+  (is (== expect-3 actual-3))
+  (is (zero? (ev/count chan))))
 
 
 (deftest run-fail-incomplete
-  (def [recv send] (make-stream))
+  (def [recv send chan] (make-stream))
   (def env (make-env))
   (def parser (parser/new))
-  (def [send-out-1 send-out-2 send-err] (make-sends send req))
+  (def [send-ret send-out-1 send-out-2 send-err] (make-sends send req))
   (def actual-1
-    (protect
-      (e/run "(print \"Hello world\""
+    (e/run "(print \"Hello world\""
              :env env
              :parser parser
+             :ret send-ret
              :out-1 send-out-1
              :out-2 send-out-2
-             :err send-err)))
-  (def expect-1 [false u/err-sentinel])
-  (is (== expect-1 actual-1))
+             :err send-err))
+  (is (nil? actual-1))
   (def actual-2 (recv))
-  (def expect-2-msg
-    "<mrepl>:1:20: parse error: unexpected end of source, ( opened at line 1, column 1\n")
-  (def expect-2 {"tag" "err"
-                 "op" "env/eval"
-                 "lang" u/lang
-                 "req" "1"
-                 "sess" "1"
-                 "msg" expect-2-msg})
-  (is (== expect-2 actual-2)))
+  (def expect-msg
+    "parse error: unexpected end of source, ( opened at line 1, column 1")
+  (def expect {"tag" "err"
+               "op" "env/eval"
+               "lang" u/lang
+               "req" "1"
+               "sess" "1"
+               "done" false
+               "msg" expect-msg
+               "janet/path" :<mrepl>
+               "janet/col" 20
+               "janet/line" 1})
+  (is (== expect actual-2))
+  (is (zero? (ev/count chan))))
 
 
 (run-tests!)
