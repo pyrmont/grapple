@@ -1,6 +1,5 @@
 (import /deps/testament/src/testament :prefix "" :exit true)
 (import ../lib/utilities :as u)
-(import ../lib/handler :as h)
 (import ../lib/evaluator :as e)
 
 
@@ -11,13 +10,6 @@
   [(fn [] (ev/take chan))
    (fn [v] (ev/give chan v))
    chan])
-
-
-(defn make-sends [req send]
-  [(u/make-send-ret req send)
-   (u/make-send-out req send "out")
-   (u/make-send-out req send "err")
-   (u/make-send-err req send)])
 
 
 # Generic eval request
