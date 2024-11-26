@@ -49,11 +49,12 @@
                "req" "1"
                "sess" "2"
                "done" true
-               "val" {"arch" (string (os/arch))
+               "val" {"arch" (os/arch)
                       "impl" (string "janet/" janet/version)
                       "lang" u/lang
-                      "os" (string (os/which))
-                      "ver" "mrepl/1"}})
+                      "os" (os/which)
+                      "prot" u/prot
+                      "serv" u/proj}})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -112,11 +113,12 @@
                "req" "1"
                "sess" "1"
                "done" true
-               "val" {"arch" (string (os/arch))
+               "val" {"arch" (os/arch)
                       "impl" (string "janet/" janet/version)
                       "lang" u/lang
-                      "os" (string (os/which))
-                      "ver" "mrepl/1"}})
+                      "os" (os/which)
+                      "prot" u/prot
+                      "serv" u/proj}})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 

@@ -1,4 +1,6 @@
 (def lang "net.inqk/janet/1.0")
+(def proj "grapple/1.0.0-dev")
+(def prot "mrepl/1")
 
 
 (defn literalise [val]

@@ -31,11 +31,12 @@
 
 
 (defn- info-msg []
-  {"ver" "mrepl/1"
+  {"prot" util/prot
    "lang" util/lang
    "impl" (string "janet/" janet/version)
-   "os" (string (os/which))
-   "arch" (string (os/arch))})
+   "os" (os/which)
+   "arch" (os/arch)
+   "serv" util/proj})
 
 
 (defn- end-sess [sess-id]
