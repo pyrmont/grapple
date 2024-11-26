@@ -37,7 +37,10 @@
      "req" "1"
      "sess" "1"
      "done" false
-     "val" "3"})
+     "val" "3"
+     "janet/path" :<mrepl>
+     "janet/line" 1
+     "janet/col" 1})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
@@ -66,7 +69,10 @@
      "req" "1"
      "sess" "1"
      "done" false
-     "val" "nil"})
+     "val" "nil"
+     "janet/path" :<mrepl>
+     "janet/line" 1
+     "janet/col" 1})
   (is (== expect-3 actual-3))
   (is (zero? (ev/count chan))))
 
@@ -80,16 +86,16 @@
   (def actual-2 (recv))
   (def expect-msg
     "parse error: unexpected end of source, ( opened at line 1, column 1")
-  (def expect {"tag" "err"
-               "op" "env/eval"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "msg" expect-msg
-               "janet/path" :<mrepl>
-               "janet/col" 20
-               "janet/line" 1})
-  (is (== expect actual-2))
+  (def expect-2 {"tag" "err"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" expect-msg
+                 "janet/path" :<mrepl>
+                 "janet/col" 20
+                 "janet/line" 1})
+  (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 
@@ -102,16 +108,16 @@
   (def actual-2 (recv))
   (def expect-msg
     "compile error: unknown symbol foo")
-  (def expect {"tag" "err"
-               "op" "env/eval"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "msg" expect-msg
-               "janet/path" :<mrepl>
-               "janet/col" 1
-               "janet/line" 1})
-  (is (== expect actual-2))
+  (def expect-2 {"tag" "err"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" expect-msg
+                 "janet/path" :<mrepl>
+                 "janet/col" 1
+                 "janet/line" 1})
+  (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 
@@ -124,14 +130,58 @@
   (def actual-2 (recv))
   (def expect-msg
     "error: could not find method :+ for 1 or :r+ for nil")
-  (def expect {"tag" "err"
-               "op" "env/eval"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "msg" expect-msg
-               "janet/stack" (actual-2 "janet/stack")})
-  (is (== expect actual-2))
+  (def expect-2 {"tag" "err"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" expect-msg
+                 "janet/stack" (actual-2 "janet/stack")})
+  (is (== expect-2 actual-2))
+  (is (zero? (ev/count chan))))
+
+
+(deftest run-warn-compiler
+  (def [recv send chan] (make-stream))
+  (def env (make-env))
+  (def actual-1
+    (e/run "(def x :deprecated 1) (inc x)" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-2 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "1"
+                 "janet/path" :<mrepl>
+                 "janet/col" 1
+                 "janet/line" 1})
+  (is (== expect-2 actual-2))
+  (def actual-3 (recv))
+  (def expect-3 {"tag" "note"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" "compile warning (normal): x is deprecated"
+                 "janet/path" :<mrepl>
+                 "janet/col" 23
+                 "janet/line" 1})
+  (is (== expect-3 actual-3))
+  (def actual-4 (recv))
+  (def expect-4 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "2"
+                 "janet/path" :<mrepl>
+                 "janet/col" 23
+                 "janet/line" 1})
+  (is (== expect-4 actual-4))
   (is (zero? (ev/count chan))))
 
 

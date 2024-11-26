@@ -1,5 +1,4 @@
-(def lang "net.inqk/janet")
-# (def err-sentinel @"")
+(def lang "net.inqk/janet/1.0")
 
 
 (defn literalise [val]

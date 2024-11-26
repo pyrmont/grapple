@@ -176,7 +176,10 @@
                "req" "1"
                "sess" "1"
                "done" false
-               "val" "3"})
+               "val" "3"
+               "janet/path" :<mrepl>
+               "janet/line" 1
+               "janet/col" 1})
   (is (== expect actual-1))
   (is actual-2)
   (is (zero? (ev/count chan))))
@@ -184,11 +187,12 @@
 
 (deftest handle-env-load
   (def [recv send chan] (make-stream))
+  (def path "test/resources/handler-env-load.txt")
   (h/handle {"op" "env/load"
              "lang" u/lang
              "id" "1"
              "sess" "1"
-             "path" "test/resources/handler-env-load.txt"}
+             "path" path}
             send)
   (def actual-1 (recv))
   (def actual-2 (recv))
@@ -199,7 +203,10 @@
                "req" "1"
                "sess" "1"
                "done" false
-               "val" "1"})
+               "val" "1"
+               "janet/path" path
+               "janet/line" 4
+               "janet/col" 1})
   (is (== expect actual-2))
   (is actual-3)
   (is (zero? (ev/count chan))))

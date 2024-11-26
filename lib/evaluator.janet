@@ -21,12 +21,16 @@
 
 
 (defn debugger-on-status [env level send-ret send-err]
-  (fn :debugger [f x]
+  (fn :debugger [f x where line col]
     (def fs (fiber/status f))
     (if (= :dead fs)
       (do
         (put env '_ @{:value x})
-        (send-ret (util/literalise x) {"done" false}))
+        (send-ret (util/literalise x)
+                  {"done" false
+                   "janet/path" where
+                   "janet/line" line
+                   "janet/col" col}))
       (do
         (send-err (string (fiber/status f) ": " x)
                   {"janet/stack" (debug/stack f)})
@@ -44,7 +48,7 @@
 
 
 # based on run-context
-(defn run [code &named env path req send]
+(defn run [code &named env parser path req send]
   (def err (util/make-send-err req send))
   (def note (util/make-send-note req send))
   (def out-1 (util/make-send-out req send "out"))
@@ -57,6 +61,7 @@
   (def on-parse-error (bad-parse err))
   (def evaluator (fn evaluate [x &] (x)))
   (def where (or path :<mrepl>))
+  (def p (or parser (parser/new)))
   (def guard :ydt)
 
   # normally located outside run-context body
@@ -104,7 +109,8 @@
         env))
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
-      (when good (set resumeval (on-status f res)))))
+      (when good
+        (set resumeval (on-status f res where l c)))))
 
   # Handle parser error in the correct environment
   (defn parse-err [p where]
@@ -119,7 +125,6 @@
     (eval1 (in tup 0) ;(tuple/sourcemap tup)))
 
   # Parse and evaluate
-  (def p (parser/new))
   (var pindex 0)
   (def len (length code))
   (if (= len 0) (parser/eof p))
