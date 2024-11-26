@@ -165,23 +165,30 @@
              "lang" u/lang
              "id" "1"
              "sess" "1"
-             "done" true
              "code" "(+ 1 2)"}
             send)
-  (def actual-1 (recv))
+  (def actual-1 (do (recv) (recv)))
+  (def expect-1 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true})
+  (is (== expect-1 actual-1))
+  (h/handle {"op" "env/eval"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "code" 5}
+            send)
   (def actual-2 (recv))
-  (def expect {"tag" "ret"
-               "op" "env/eval"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "done" false
-               "val" "3"
-               "janet/path" :<mrepl>
-               "janet/line" 1
-               "janet/col" 1})
-  (is (== expect actual-1))
-  (is actual-2)
+  (def expect-2 {"tag" "err"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" "code must be string"})
+  (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 
@@ -194,21 +201,29 @@
              "sess" "1"
              "path" path}
             send)
-  (def actual-1 (recv))
+  (def actual-1 (do (recv) (recv) (recv)))
+  (def expect-1 {"tag" "ret"
+                 "op" "env/load"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true})
+  (is (== expect-1 actual-1))
+  (h/handle {"op" "env/load"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" "path/to/nowhere.txt"}
+            send)
   (def actual-2 (recv))
-  (def actual-3 (recv))
-  (def expect {"tag" "ret"
-               "op" "env/load"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "done" false
-               "val" "1"
-               "janet/path" path
-               "janet/line" 4
-               "janet/col" 1})
-  (is (== expect actual-2))
-  (is actual-3)
+  (def expect-msg "request failed: could not open file path/to/nowhere.txt")
+  (def expect-2 {"tag" "err"
+                 "op" "env/load"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" expect-msg})
+  (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 
@@ -219,18 +234,34 @@
              "lang" u/lang
              "id" "1"
              "sess" "1"
-             "sym" 'x}
+             "sym" "x"
+             "janet/type" "symbol"}
             send)
-  (def actual (recv))
-  (def expect {"tag" "ret"
-               "op" "env/doc"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "done" true
-               "val" "The number five."
-               "janet/type" "number"})
-  (is (== expect actual))
+  (def actual-1 (recv))
+  (def expect-1 {"tag" "ret"
+                 "op" "env/doc"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true
+                 "val" "The number five."
+                 "janet/type" :number})
+  (is (== expect-1 actual-1))
+  (h/handle {"op" "env/doc"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "sym" "y"
+             "janet/type" "symbol"}
+            send)
+  (def actual-2 (recv))
+  (def expect-2 {"tag" "err"
+                 "op" "env/doc"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" "symbol y not found"})
+  (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 

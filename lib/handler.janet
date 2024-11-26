@@ -54,7 +54,8 @@
 (defn handle-sess-new [req send-ret send-err]
   (def sess (make-sess))
   (unless sess
-    (send-err "failed to start session"))
+    (send-err "failed to start session")
+    (break))
   (send-ret (info-msg) {"sess" sess}))
 
 
@@ -84,6 +85,11 @@
 
 (defn handle-env-eval [req send-ret send-err send]
   (def {"code" code "path" path} req)
+  (unless (string? code)
+    (send-err "code must be string")
+    (break))
+  (unless (or (nil? path) (string? path))
+    (send-err "path must be string"))
   (def res (eval/run code
                      :env env
                      :path path
@@ -111,8 +117,14 @@
              "keyword" (keyword sym-str)
              sym-str))
   (def bind (env sym))
-  (send-ret (bind :doc) {"janet/type" (string (type (bind :value)))
-                         "janet/sm" (bind :source-map)}))
+  (if bind
+    (send-ret (bind :doc) {"janet/type" (type (bind :value))
+                           "janet/sm" (bind :source-map)})
+    (send-err (string (if sym_t sym_t "value")
+                      " "
+                      (if (= "keyword" sym_t) ":")
+                      sym-str
+                      " not found"))))
 
 
 (defn handle-env-cmpl [req send-ret send-err]
@@ -146,27 +158,30 @@
 (defn handle [req send]
   (def send-ret (util/make-send-ret req send))
   (def send-err (util/make-send-err req send))
-  (do
-    (def op (req "op"))
-    (def spec (ops op))
-    (unless spec
-      (send-err "unsupported operation")
-      (break false))
-    (unless (confirm req (spec :req) send-err)
-      (break false))
-    (unless (= util/lang (req "lang"))
-      (send-err "unsupported language version")
-      (break false))
-    (case op
-      "sess/new" (handle-sess-new req send-ret send-err)
-      "sess/end" (handle-sess-end req send-ret send-err)
-      "sess/list" (handle-sess-list req send-ret send-err)
-      "serv/info" (handle-serv-info req send-ret send-err)
-      "serv/stop" (handle-serv-stop req send-ret send-err)
-      "serv/relo" (handle-serv-relo req send-ret send-err)
-      "env/eval" (handle-env-eval req send-ret send-err send)
-      "env/load" (handle-env-load req send-ret send-err send)
-      "env/stop" (send-err "operation not implemented")
-      "env/doc" (handle-env-doc req send-ret send-err)
-      "env/cmpl" (handle-env-cmpl req send-ret send-err))
-    true))
+  (try
+    (do
+      (def op (req "op"))
+      (def spec (ops op))
+      (unless spec
+        (send-err "unsupported operation")
+        (break false))
+      (unless (confirm req (spec :req) send-err)
+        (break false))
+      (unless (= util/lang (req "lang"))
+        (send-err "unsupported language version")
+        (break false))
+      (case op
+        "sess/new" (handle-sess-new req send-ret send-err)
+        "sess/end" (handle-sess-end req send-ret send-err)
+        "sess/list" (handle-sess-list req send-ret send-err)
+        "serv/info" (handle-serv-info req send-ret send-err)
+        "serv/stop" (handle-serv-stop req send-ret send-err)
+        "serv/relo" (handle-serv-relo req send-ret send-err)
+        "env/eval" (handle-env-eval req send-ret send-err send)
+        "env/load" (handle-env-load req send-ret send-err send)
+        "env/stop" (send-err "operation not implemented")
+        "env/doc" (handle-env-doc req send-ret send-err)
+        "env/cmpl" (handle-env-cmpl req send-ret send-err))
+      true)
+    ([e]
+     (send-err (string "request failed: " e)))))
