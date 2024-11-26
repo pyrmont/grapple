@@ -93,13 +93,13 @@
                  "sess" "1"
                  "msg" expect-msg
                  "janet/path" :<mrepl>
-                 "janet/col" 20
-                 "janet/line" 1})
+                 "janet/line" 1
+                 "janet/col" 20})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
 
-(deftest run-fail-compiler
+(deftest run-fail-compiler-1
   (def [recv send chan] (make-stream))
   (def env (make-env))
   (def actual-1
@@ -115,9 +115,43 @@
                  "sess" "1"
                  "msg" expect-msg
                  "janet/path" :<mrepl>
-                 "janet/col" 1
-                 "janet/line" 1})
+                 "janet/line" 1
+                 "janet/col" 1})
   (is (== expect-2 actual-2))
+  (is (zero? (ev/count chan))))
+
+
+(deftest run-fail-compiler-2
+  (def [recv send chan] (make-stream))
+  (def env (make-env))
+  (def actual-1
+    (e/run "(defmacro foo [x] (x)) (foo 1)" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-2 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "<function foo>"
+                 "janet/path" :<mrepl>
+                 "janet/line" 1
+                 "janet/col" 1})
+  (is (== expect-2 actual-2))
+  (def actual-3 (recv))
+  (def expect-msg "compile error: error: (macro) 1 called with 0 arguments, possibly expected 1")
+  (def expect-3 {"tag" "err"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "msg" expect-msg
+                 "janet/path" :<mrepl>
+                 "janet/line" 1
+                 "janet/col" 24
+                 "janet/stack" [{:col 19 :line 1 :name "foo" :path "<mrepl>"}]})
+  (is (== expect-3 actual-3))
   (is (zero? (ev/count chan))))
 
 
@@ -136,7 +170,10 @@
                  "req" "1"
                  "sess" "1"
                  "msg" expect-msg
-                 "janet/stack" (actual-2 "janet/stack")})
+                 "janet/path" :<mrepl>
+                 "janet/line" 1
+                 "janet/col" 1
+                 "janet/stack" [{:col 1 :line 1 :name "thunk" :path "<mrepl>"}]})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 

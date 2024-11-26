@@ -1,16 +1,50 @@
 (import ./utilities :as util)
 
 
-(defn bad-compile [send-err]
+(defn- stack [f]
+  (def frames (debug/stack f))
+  (each frame frames
+    (each k (keys frame)
+      (case k
+        :name
+        nil # keep key
+
+        :source
+        (do
+          (def v (frame :source))
+          (put frame :source nil)
+          (put frame :path v))
+
+        :source-column
+        (do
+          (def v (frame :source-column))
+          (put frame :source-column nil)
+          (put frame :col v))
+
+        :source-line
+        (do
+          (def v (frame :source-line))
+          (put frame :source-line nil)
+          (put frame :line v))
+
+        (put frame k nil))))
+  frames)
+
+
+(defn- bad-compile [send-err]
   (fn :bad-compile [msg macrof where &opt line col]
-    (def full-msg (string "compile error: " msg))
+    (def full-msg
+      (string "compile error: "
+              (if macrof (string (fiber/status macrof) ": "))
+              msg))
     (def details {"janet/path" where
                   "janet/line" line
-                  "janet/col" col})
+                  "janet/col" col
+                  "janet/stack" (if macrof (stack macrof))})
     (send-err full-msg details)))
 
 
-(defn bad-parse [send-err]
+(defn- bad-parse [send-err]
   (fn :bad-parse [p where]
     (def [line col] (parser/where p))
     (def full-msg (string "parse error: " (parser/error p)))
@@ -20,7 +54,7 @@
     (send-err full-msg details)))
 
 
-(defn debugger-on-status [env level send-ret send-err]
+(defn- debugger-on-status [env level send-ret send-err]
   (fn :debugger [f x where line col]
     (def fs (fiber/status f))
     (if (= :dead fs)
@@ -33,12 +67,15 @@
                    "janet/col" col}))
       (do
         (send-err (string (fiber/status f) ": " x)
-                  {"janet/stack" (debug/stack f)})
+                  {"janet/path" where
+                   "janet/line" line
+                   "janet/col" col
+                   "janet/stack" (stack f)})
         # (if (get env :debug) (debugger f level))
         ))))
 
 
-(defn warn-compile [send-note]
+(defn- warn-compile [send-note]
   (fn :warn-compile [msg level where &opt line col]
     (def full-msg (string "compile warning (" level "): " msg))
     (def details {"janet/path" where
@@ -49,6 +86,7 @@
 
 # based on run-context
 (defn run [code &named env parser path req send]
+  (unless (and req send) (error "missing :req and :send parameters"))
   (def err (util/make-send-err req send))
   (def note (util/make-send-note req send))
   (def out-1 (util/make-send-out req send "out"))
