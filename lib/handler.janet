@@ -183,6 +183,7 @@
         "env/stop" (send-err "operation not implemented")
         "env/doc" (handle-env-doc req send-ret send-err)
         "env/cmpl" (handle-env-cmpl req send-ret send-err))
+      # return value
       true)
     ([e]
      (send-err (string "request failed: " e)))))
