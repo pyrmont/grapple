@@ -172,7 +172,7 @@
   (is (== expect-6 actual-6))
   (def actual-7 @"")
   (with-dyns [:out actual-7]
-    (:close conn)
+    (c/disconnect conn)
     (set client nil)
     (s/stop server)
     (set server nil))
