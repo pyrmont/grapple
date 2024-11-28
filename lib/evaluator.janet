@@ -2,33 +2,11 @@
 
 
 (defn- stack [f]
-  (def frames (debug/stack f))
-  (each frame frames
-    (each k (keys frame)
-      (case k
-        :name
-        nil # keep key
-
-        :source
-        (do
-          (def v (frame :source))
-          (put frame :source nil)
-          (put frame :path v))
-
-        :source-column
-        (do
-          (def v (frame :source-column))
-          (put frame :source-column nil)
-          (put frame :col v))
-
-        :source-line
-        (do
-          (def v (frame :source-line))
-          (put frame :source-line nil)
-          (put frame :line v))
-
-        (put frame k nil))))
-  frames)
+  (map (fn [fr] {:name (fr :name)
+                 :path (fr :source)
+                 :line (fr :source-line)
+                 :col  (fr :source-column)})
+       (debug/stack f)))
 
 
 (defn- bad-compile [send-err]
