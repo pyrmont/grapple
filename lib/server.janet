@@ -39,3 +39,9 @@
     (print "Server stopping..."))
   (:close s)
   (h/reset))
+
+
+(defn main [& args]
+  (def host (when (> (length args) 1) (args 1)))
+  (def port (when (> (length args) 2) (args 2)))
+  (def s (start :host host :port port)))
