@@ -1,15 +1,13 @@
 # This code assumes that messages received will not have a length
 # exceeding 2^32 - 1. Is this a safe assumption?
-
-
 (import ../deps/medea/medea :as json)
 
 
 (defn make-recv [stream]
   (def buf @"")
   (fn :receiver []
-    (def more? (:read stream 4 buf))
-    (when more?
+    (buffer/clear buf)
+    (when (:read stream 4 buf)
       (if-not (= 4 (length buf))
         (error "failed to read message length"))
       (def [b0 b1 b2 b3] buf)
@@ -24,6 +22,7 @@
 (defn make-send [stream]
   (def buf @"")
   (fn :sender [msg]
+    (buffer/clear buf)
     (def payload (json/encode msg))
     (buffer/push-word buf (length payload))
     (buffer/push-string buf payload)
