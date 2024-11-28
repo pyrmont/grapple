@@ -7,7 +7,8 @@
   (def buf @"")
   (fn :receiver []
     (buffer/clear buf)
-    (when (:read stream 4 buf)
+    (def [success? res] (protect (:read stream 4 buf)))
+    (when (and success? (not= nil res))
       (if-not (= 4 (length buf))
         (error "failed to read message length"))
       (def [b0 b1 b2 b3] buf)

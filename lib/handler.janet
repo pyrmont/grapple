@@ -30,6 +30,12 @@
   true)
 
 
+(defn reset []
+  (set env (make-env))
+  (table/clear sessions)
+  (set sess-counter 0))
+
+
 (defn- info-msg []
   {"prot" util/prot
    "lang" util/lang

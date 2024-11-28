@@ -37,4 +37,5 @@
 (defn stop [s &named quiet?]
   (unless quiet?
     (print "Server stopping..."))
-  (:close s))
+  (:close s)
+  (h/reset))

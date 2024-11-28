@@ -1,6 +1,7 @@
 (import /deps/testament/src/testament :prefix "" :exit true)
 (import ../lib/utilities :as u)
 (import ../lib/transport :as t)
+(import ../lib/handler :as h)
 (import ../lib/server :as s)
 (import ../lib/client :as c)
 
@@ -63,7 +64,6 @@
 (deftest client-echo
   (defn handler [conn]
     (def [recv send] (make-streams conn))
-    (var n 0)
     (forever
       (def req (recv))
       (if (nil? req) (break))
@@ -77,6 +77,107 @@
     (send expect)
     (def actual (recv))
     (is (== expect actual))))
+
+
+(deftest client-complex
+  (defn handler [conn]
+    (def [recv send] (make-streams conn))
+    (forever
+      (def req (recv))
+      (if (nil? req) (break))
+      (h/handle req send)))
+  (set server (s/start :handler handler :quiet? true))
+  (def [recv send conn] (c/connect :quiet? true))
+  (is (and recv send conn))
+  (set client conn)
+  (send {"op" "sess/new"
+         "lang" u/lang
+         "id" "1"})
+  (def actual-1 (recv))
+  (def expect-1 {"tag" "ret"
+                 "op" "sess/new"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true
+                 "val" {"prot" u/prot
+                        "lang" u/lang
+                        "impl" (string "janet/" janet/version)
+                        "os" (string (os/which))
+                        "arch" (string (os/arch))
+                        "serv" u/proj}})
+  (is (== expect-1 actual-1))
+  (send {"op" "sess/list"
+         "lang" u/lang
+         "id" "1"
+         "sess" "1"})
+  (def actual-2 (recv))
+  (def expect-2 {"tag" "ret"
+                 "op" "sess/list"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true
+                 "val" ["1"]})
+  (is (== expect-2 actual-2))
+  (send {"op" "env/eval"
+         "lang" u/lang
+         "id" "1"
+         "sess" "1"
+         "code" "(def a 5)"})
+  (def actual-3 (recv))
+  (def expect-3 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "5"
+                 "janet/path" "<mrepl>"
+                 "janet/line" 1
+                 "janet/col" 1})
+  (is (== expect-3 actual-3))
+  (def actual-4 (recv))
+  (def expect-4 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true})
+  (is (== expect-4 actual-4))
+  (send {"op" "env/eval"
+         "lang" u/lang
+         "id" "1"
+         "sess" "1"
+         "code" "(inc a)"})
+  (def actual-5 (recv))
+  (def expect-5 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "6"
+                 "janet/path" "<mrepl>"
+                 "janet/line" 1
+                 "janet/col" 1})
+  (is (== expect-5 actual-5))
+  (def actual-6 (recv))
+  (def expect-6 {"tag" "ret"
+                 "op" "env/eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true})
+  (is (== expect-6 actual-6))
+  (def actual-7 @"")
+  (with-dyns [:out actual-7]
+    (:close conn)
+    (set client nil)
+    (s/stop server)
+    (set server nil))
+  (def expect-7 "Server stopping...\n")
+  (is (== expect-7 actual-7)))
 
 
 (use-fixtures :each teardown)
