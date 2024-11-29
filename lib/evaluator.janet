@@ -99,6 +99,12 @@
         (fn []
           (setdyn :out out-1)
           (setdyn :err out-2)
+          (setdyn :module-make-env
+                  (fn maker []
+                    (def env (make-env))
+                    (put env :out out-1)
+                    (put env :err out-2)
+                    (put env :module-make-env maker)))
           (array/clear lints)
           (def res (compile source env where lints))
           (unless (empty? lints)
