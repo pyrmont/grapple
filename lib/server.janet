@@ -6,7 +6,7 @@
 (def default-port 3737)
 
 
-(defn- make-default-handler [quiet?]
+(defn- make-default-handler [sessions quiet?]
   (fn :handler [conn]
     (unless quiet?
       (print "Connection opened"))
@@ -15,15 +15,17 @@
     (forever
       (def req (recv))
       (if (nil? req) (break))
-      (h/handle req send))
+      (h/handle req sessions send))
     (unless quiet?
       (print "Connection closed"))))
 
 
 (defn start [&named host port handler quiet?]
+  (def sessions @{:count 0 :clients: @{}})
+
   (default host default-host)
   (default port default-port)
-  (default handler (make-default-handler quiet?))
+  (default handler (make-default-handler sessions quiet?))
 
   (unless quiet?
     (print "Server starting on port " port "..."))
@@ -37,8 +39,7 @@
 (defn stop [s &named quiet?]
   (unless quiet?
     (print "Server stopping..."))
-  (:close s)
-  (h/reset))
+  (:close s))
 
 
 (defn main [& args]

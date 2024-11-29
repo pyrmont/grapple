@@ -80,12 +80,13 @@
 
 
 (deftest client-complex
+  (def sessions @{:count 0 :clients @{}})
   (defn handler [conn]
     (def [recv send] (make-streams conn))
     (forever
       (def req (recv))
       (if (nil? req) (break))
-      (h/handle req send)))
+      (h/handle req sessions send)))
   (set server (s/start :handler handler :quiet? true))
   (def [recv send conn] (c/connect :quiet? true))
   (is (and recv send conn))

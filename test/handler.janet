@@ -3,19 +3,27 @@
 (import ../lib/handler :as h)
 
 
+# Fixtures
+
+(def sessions @{})
+
+
+(defn setup [t]
+  (put sessions :count 1)
+  (put sessions :clients @{"1" true})
+  (t))
+
+
+(defn teardown [t]
+  (t)
+  (table/clear sessions))
+
+
 # Utility Functions
 
 (defn make-stream []
   (def chan (ev/chan 5))
   [(fn [] (ev/take chan)) (fn [v] (ev/give chan v)) chan])
-
-
-# Fixture Functions
-
-(defn teardown [t]
-  (t)
-  (table/clear h/sessions)
-  (set h/sess-counter 0))
 
 
 # Tests
@@ -33,13 +41,12 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-sess-new
+(deftest sess-new
   (def [recv send chan] (make-stream))
-  (put h/sessions "1" true)
-  (set h/sess-counter 1)
   (h/handle {"op" "sess/new"
              "lang" u/lang
              "id" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -58,12 +65,13 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-sess-end
+(deftest sess-end
   (def [recv send chan] (make-stream))
   (h/handle {"op" "sess/end"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -77,14 +85,14 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-sess-list
+(deftest sess-list
   (def [recv send chan] (make-stream))
-  (put h/sessions "1" true)
-  (put h/sessions "2" true)
+  (put (sessions :clients) "2" true)
   (h/handle {"op" "sess/list"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -98,12 +106,13 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-serv-info
+(deftest serv-info
   (def [recv send chan] (make-stream))
   (h/handle {"op" "serv/info"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -122,12 +131,13 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-serv-stop
+(deftest serv-stop
   (def [recv send chan] (make-stream))
   (h/handle {"op" "serv/stop"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -141,12 +151,13 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-serv-relo
+(deftest serv-relo
   (def [recv send chan] (make-stream))
   (h/handle {"op" "serv/relo"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
+            sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
@@ -160,7 +171,7 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-env-eval
+(deftest env-eval
   (def [recv send chan] (make-stream))
   (h/handle {"op" "env/eval"
              "lang" u/lang
@@ -168,6 +179,7 @@
              "sess" "1"
              "ns" u/ns
              "code" "(+ 1 2)"}
+            sessions
             send)
   (def actual-1 (do (recv) (recv)))
   (def expect-1 {"tag" "ret"
@@ -183,6 +195,7 @@
              "sess" "1"
              "ns" u/ns
              "code" 5}
+            sessions
             send)
   (def actual-2 (recv))
   (def expect-2 {"tag" "err"
@@ -195,7 +208,7 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-env-load
+(deftest env-load
   (def [recv send chan] (make-stream))
   (def path "test/resources/handler-env-load.txt")
   (h/handle {"op" "env/load"
@@ -203,6 +216,7 @@
              "id" "1"
              "sess" "1"
              "path" path}
+            sessions
             send)
   (def actual-1 (do (recv) (recv) (recv)))
   (def expect-1 {"tag" "ret"
@@ -217,6 +231,7 @@
              "id" "1"
              "sess" "1"
              "path" "path/to/nowhere.txt"}
+            sessions
             send)
   (def actual-2 (recv))
   (def expect-msg "request failed: could not open file path/to/nowhere.txt")
@@ -230,7 +245,7 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-env-doc
+(deftest env-doc
   (def [recv send chan] (make-stream))
   (def env @{'x @{:doc "The number five." :value 5}})
   (put module/cache u/ns env)
@@ -241,6 +256,7 @@
              "ns" u/ns
              "sym" "x"
              "janet/type" "symbol"}
+            sessions
             send)
   (put module/cache u/ns nil)
   (def actual-1 (recv))
@@ -260,6 +276,7 @@
              "ns" u/ns
              "sym" "y"
              "janet/type" "symbol"}
+            sessions
             send)
   (def actual-2 (recv))
   (def expect-2 {"tag" "err"
@@ -272,7 +289,7 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest handle-env-cmpl
+(deftest env-cmpl
   (def [recv send chan] (make-stream))
   (def env @{'foo1 @{:value 1}
              'foo2 @{:value 2}})
@@ -284,6 +301,7 @@
              "ns" u/ns
              "sym" "foo"
              "janet/type" "symbol"}
+            sessions
             send)
   (put module/cache u/ns nil)
   (def actual (recv))
@@ -298,6 +316,5 @@
   (is (zero? (ev/count chan))))
 
 
-(use-fixtures :each teardown)
-
+(use-fixtures :each setup teardown)
 (run-tests!)

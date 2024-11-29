@@ -2,8 +2,6 @@
 (import ./evaluator :as eval)
 
 
-(def sessions @{})
-(var sess-counter 0)
 (def match-max 20)
 
 
@@ -29,11 +27,6 @@
   true)
 
 
-(defn reset []
-  (table/clear sessions)
-  (set sess-counter 0))
-
-
 (defn- info-msg []
   {"prot" util/prot
    "lang" util/lang
@@ -43,52 +36,53 @@
    "serv" util/proj})
 
 
-(defn- end-sess [sess-id]
-  (put sessions sess-id nil))
+(defn- end-sess [sessions sess-id]
+  (put (sessions :clients) sess-id nil))
 
 
-(defn- make-sess []
-  (set sess-counter (inc sess-counter))
-  (def sess-id (string sess-counter))
-  (put sessions sess-id true)
+(defn- make-sess [sessions]
+  (def count (inc (sessions :count)))
+  (put sessions :count count)
+  (def sess-id (string count))
+  (put (sessions :clients) sess-id true)
   sess-id)
 
 
 # Handle functions
 
-(defn handle-sess-new [req send-ret send-err]
-  (def sess (make-sess))
+(defn sess-new [req sns send-ret send-err]
+  (def sess (make-sess sns))
   (unless sess
     (send-err "failed to start session")
     (break))
   (send-ret (info-msg) {"sess" sess}))
 
 
-(defn handle-sess-end [req send-ret send-err]
+(defn sess-end [req sns send-ret send-err]
   (def sess (req "sess"))
-  (end-sess sess)
+  (end-sess sns sess)
   (send-ret "Session ended."))
 
 
-(defn handle-sess-list [req send-ret send-err]
-  (send-ret (keys sessions)))
+(defn sess-list [req sns send-ret send-err]
+  (send-ret (keys (sns :clients))))
 
 
-(defn handle-serv-info [req send-ret send-err]
+(defn serv-info [req sns send-ret send-err]
   (send-ret (info-msg)))
 
 
 # TODO: implement
-(defn handle-serv-stop [req send-ret send-err]
+(defn serv-stop [req sns send-ret send-err]
   (send-ret "Server shutting down..."))
 
 
 # TODO: implement
-(defn handle-serv-relo [req send-ret send-err]
+(defn serv-relo [req sns send-ret send-err]
   (send-ret "Server reloading..."))
 
 
-(defn handle-env-eval [req send-ret send-err send]
+(defn env-eval [req sns send-ret send-err send]
   (def {"code" code "ns" ns "path" path} req)
   (unless (string? code)
     (send-err "code must be string")
@@ -108,7 +102,7 @@
   (send-ret res))
 
 
-(defn handle-env-load [req send-ret send-err send]
+(defn env-load [req sns send-ret send-err send]
   (def {"path" path} req)
   (def code (slurp path))
   (def eval-env (or (module/cache path)
@@ -124,7 +118,7 @@
   (send-ret res))
 
 
-(defn handle-env-doc [req send-ret send-err]
+(defn env-doc [req sns send-ret send-err]
   (def {"sym" sym-str
         "ns" ns
         "janet/type" sym_t} req)
@@ -145,7 +139,7 @@
                       " not found"))))
 
 
-(defn handle-env-cmpl [req send-ret send-err]
+(defn env-cmpl [req sns send-ret send-err]
   (def {"sym" sym-str
         "ns" ns
         "max" user-max
@@ -175,7 +169,7 @@
   (send-ret matches))
 
 
-(defn handle [req send]
+(defn handle [req sns send]
   (def send-ret (util/make-send-ret req send))
   (def send-err (util/make-send-err req send))
   (try
@@ -191,17 +185,17 @@
         (send-err "unsupported language version")
         (break false))
       (case op
-        "sess/new" (handle-sess-new req send-ret send-err)
-        "sess/end" (handle-sess-end req send-ret send-err)
-        "sess/list" (handle-sess-list req send-ret send-err)
-        "serv/info" (handle-serv-info req send-ret send-err)
-        "serv/stop" (handle-serv-stop req send-ret send-err)
-        "serv/relo" (handle-serv-relo req send-ret send-err)
-        "env/eval" (handle-env-eval req send-ret send-err send)
-        "env/load" (handle-env-load req send-ret send-err send)
+        "sess/new" (sess-new req sns send-ret send-err)
+        "sess/end" (sess-end req sns send-ret send-err)
+        "sess/list" (sess-list req sns send-ret send-err)
+        "serv/info" (serv-info req sns send-ret send-err)
+        "serv/stop" (serv-stop req sns send-ret send-err)
+        "serv/relo" (serv-relo req sns send-ret send-err)
+        "env/eval" (env-eval req sns send-ret send-err send)
+        "env/load" (env-load req sns send-ret send-err send)
         "env/stop" (send-err "operation not implemented")
-        "env/doc" (handle-env-doc req send-ret send-err)
-        "env/cmpl" (handle-env-cmpl req send-ret send-err))
+        "env/doc" (env-doc req sns send-ret send-err)
+        "env/cmpl" (env-cmpl req sns send-ret send-err))
       # return value
       true)
     ([e]
