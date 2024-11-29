@@ -38,7 +38,7 @@
      "sess" "1"
      "done" false
      "val" "3"
-     "janet/path" :<mrepl>
+     "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
   (is (== expect-2 actual-2))
@@ -70,7 +70,7 @@
      "sess" "1"
      "done" false
      "val" "nil"
-     "janet/path" :<mrepl>
+     "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
   (is (== expect-3 actual-3))
@@ -92,7 +92,7 @@
                  "req" "1"
                  "sess" "1"
                  "msg" expect-msg
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 20})
   (is (== expect-2 actual-2))
@@ -114,7 +114,7 @@
                  "req" "1"
                  "sess" "1"
                  "msg" expect-msg
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1})
   (is (== expect-2 actual-2))
@@ -135,7 +135,7 @@
                  "sess" "1"
                  "done" false
                  "val" "<function foo>"
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1})
   (is (== expect-2 actual-2))
@@ -147,10 +147,10 @@
                  "req" "1"
                  "sess" "1"
                  "msg" expect-msg
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 24
-                 "janet/stack" [{:col 19 :line 1 :name "foo" :path "<mrepl>"}]})
+                 "janet/stack" [{:col 19 :line 1 :name "foo" :path u/ns}]})
   (is (== expect-3 actual-3))
   (is (zero? (ev/count chan))))
 
@@ -170,10 +170,10 @@
                  "req" "1"
                  "sess" "1"
                  "msg" expect-msg
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1
-                 "janet/stack" [{:col 1 :line 1 :name "thunk" :path "<mrepl>"}]})
+                 "janet/stack" [{:col 1 :line 1 :name "thunk" :path u/ns}]})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
@@ -192,7 +192,7 @@
                  "sess" "1"
                  "done" false
                  "val" "1"
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/col" 1
                  "janet/line" 1})
   (is (== expect-2 actual-2))
@@ -203,7 +203,7 @@
                  "req" "1"
                  "sess" "1"
                  "msg" "compile warning (normal): x is deprecated"
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1})
   (is (== expect-3 actual-3))
@@ -215,7 +215,7 @@
                  "sess" "1"
                  "done" false
                  "val" "2"
-                 "janet/path" :<mrepl>
+                 "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1})
   (is (== expect-4 actual-4))

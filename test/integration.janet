@@ -124,6 +124,7 @@
          "lang" u/lang
          "id" "1"
          "sess" "1"
+         "ns" "<mrepl>"
          "code" "(def a 5)"})
   (def actual-3 (recv))
   (def expect-3 {"tag" "ret"
@@ -149,6 +150,7 @@
          "lang" u/lang
          "id" "1"
          "sess" "1"
+         "ns" "<mrepl>"
          "code" "(inc a)"})
   (def actual-5 (recv))
   (def expect-5 {"tag" "ret"

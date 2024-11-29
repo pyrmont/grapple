@@ -2,7 +2,6 @@
 (import ./evaluator :as eval)
 
 
-(var env (make-env))
 (def sessions @{})
 (var sess-counter 0)
 (def match-max 20)
@@ -15,11 +14,11 @@
    "serv/info" {:req ["lang" "id" "sess"]}
    "serv/stop" {:req ["lang" "id" "sess"]}
    "serv/relo" {:req ["lang" "id" "sess"]}
-   "env/eval" {:req ["lang" "id" "sess" "code"]}
+   "env/eval" {:req ["lang" "id" "sess" "code" "ns"]}
    "env/load" {:req ["lang" "id" "sess" "path"]}
    "env/stop" {:req ["lang" "id" "sess" "req"]}
-   "env/doc" {:req ["lang" "id" "sess" "sym"]}
-   "env/cmpl" {:req ["lang" "id" "sess" "sym"]}})
+   "env/doc" {:req ["lang" "id" "sess" "sym" "ns"]}
+   "env/cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}})
 
 
 (defn confirm [req ks send-err]
@@ -31,7 +30,6 @@
 
 
 (defn reset []
-  (set env (make-env))
   (table/clear sessions)
   (set sess-counter 0))
 
@@ -91,14 +89,19 @@
 
 
 (defn handle-env-eval [req send-ret send-err send]
-  (def {"code" code "path" path} req)
+  (def {"code" code "ns" ns "path" path} req)
   (unless (string? code)
     (send-err "code must be string")
     (break))
   (unless (or (nil? path) (string? path))
     (send-err "path must be string"))
+  (def eval-env (or (module/cache ns)
+                    (do
+                      (def new-env (make-env))
+                      (put module/cache ns new-env)
+                      new-env)))
   (def res (eval/run code
-                     :env env
+                     :env eval-env
                      :path path
                      :send send
                      :req req))
@@ -108,8 +111,13 @@
 (defn handle-env-load [req send-ret send-err send]
   (def {"path" path} req)
   (def code (slurp path))
+  (def eval-env (or (module/cache path)
+                    (do
+                      (def new-env (make-env))
+                      (put module/cache path new-env)
+                      new-env)))
   (def res (eval/run code
-                     :env env
+                     :env eval-env
                      :path path
                      :send send
                      :req req))
@@ -118,12 +126,15 @@
 
 (defn handle-env-doc [req send-ret send-err]
   (def {"sym" sym-str
+        "ns" ns
         "janet/type" sym_t} req)
   (def sym (case sym_t
              "symbol" (symbol sym-str)
              "keyword" (keyword sym-str)
              sym-str))
-  (def bind (env sym))
+  (def eval-env (or (module/cache ns)
+                    root-env))
+  (def bind (eval-env sym))
   (if bind
     (send-ret (bind :doc) {"janet/type" (type (bind :value))
                            "janet/sm" (bind :source-map)})
@@ -136,6 +147,7 @@
 
 (defn handle-env-cmpl [req send-ret send-err]
   (def {"sym" sym-str
+        "ns" ns
         "max" user-max
         "janet/type" sym_t} req)
   (def sym (case sym_t
@@ -145,7 +157,8 @@
   (def matches @[])
   (def max (or user-max match-max))
   (def slen (length sym))
-  (var t env)
+  (var t (or (module/cache ns)
+             root-env))
   (while t
     (each key (keys t)
       (if (and (<= slen (length key))

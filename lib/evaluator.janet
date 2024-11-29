@@ -64,7 +64,8 @@
 
 # based on run-context
 (defn run [code &named env parser path req send]
-  (unless (and req send) (error "missing :req and :send parameters"))
+  (unless (and env req send)
+    (error "missing :env, :req and :send parameters"))
   (def err (util/make-send-err req send))
   (def note (util/make-send-note req send))
   (def out-1 (util/make-send-out req send "out"))
@@ -76,7 +77,7 @@
   (def on-compile-warning (warn-compile note))
   (def on-parse-error (bad-parse err))
   (def evaluator (fn evaluate [x &] (x)))
-  (def where (or path :<mrepl>))
+  (def where (or path util/ns))
   (def p (or parser (parser/new)))
   (def guard :ydt)
 

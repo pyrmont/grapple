@@ -14,7 +14,6 @@
 
 (defn teardown [t]
   (t)
-  (table/clear h/env)
   (table/clear h/sessions)
   (set h/sess-counter 0))
 
@@ -167,6 +166,7 @@
              "lang" u/lang
              "id" "1"
              "sess" "1"
+             "ns" u/ns
              "code" "(+ 1 2)"}
             send)
   (def actual-1 (do (recv) (recv)))
@@ -181,6 +181,7 @@
              "lang" u/lang
              "id" "1"
              "sess" "1"
+             "ns" u/ns
              "code" 5}
             send)
   (def actual-2 (recv))
@@ -231,14 +232,17 @@
 
 (deftest handle-env-doc
   (def [recv send chan] (make-stream))
-  (put h/env 'x @{:doc "The number five." :value 5})
+  (def env @{'x @{:doc "The number five." :value 5}})
+  (put module/cache u/ns env)
   (h/handle {"op" "env/doc"
              "lang" u/lang
              "id" "1"
              "sess" "1"
+             "ns" u/ns
              "sym" "x"
              "janet/type" "symbol"}
             send)
+  (put module/cache u/ns nil)
   (def actual-1 (recv))
   (def expect-1 {"tag" "ret"
                  "op" "env/doc"
@@ -253,6 +257,7 @@
              "lang" u/lang
              "id" "1"
              "sess" "1"
+             "ns" u/ns
              "sym" "y"
              "janet/type" "symbol"}
             send)
@@ -269,15 +274,18 @@
 
 (deftest handle-env-cmpl
   (def [recv send chan] (make-stream))
-  (put h/env 'foo1 @{:value 1})
-  (put h/env 'foo2 @{:value 2})
+  (def env @{'foo1 @{:value 1}
+             'foo2 @{:value 2}})
+  (put module/cache u/ns env)
   (h/handle {"op" "env/cmpl"
              "lang" u/lang
              "id" "1"
              "sess" "1"
+             "ns" u/ns
              "sym" "foo"
              "janet/type" "symbol"}
             send)
+  (put module/cache u/ns nil)
   (def actual (recv))
   (def expect {"tag" "ret"
                "op" "env/cmpl"
