@@ -1,17 +1,16 @@
 (import ./utilities :as util)
 
 
-(def- root-env
+(def- eval-root
   (do
-    (defn make-env [&opt parent]
-      (default parent root-env)
-      (table/setproto @{} parent))
     (def new-root (table/clone root-env))
+    (defn make-eval-env [&opt parent]
+      (default parent new-root)
+      (table/setproto @{} parent))
     (put-in new-root ['root-env :value] new-root)
-    (put-in new-root ['make-env :value] make-env)
+    (put-in new-root ['make-env :value] make-eval-env)
     (put-in new-root ['stdout :value] (fn :out [x] (xprin (dyn :out) x)))
-    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :err) x)))
-    new-root))
+    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :err) x)))))
 
 
 (defn- stack [f]
