@@ -48,7 +48,6 @@
 (defn main [& args]
   (def host (when (> (length args) 1) (args 1)))
   (def port (when (> (length args) 2) (args 2)))
-  (def log-level (when (> (length args) 3) :debug))
+  (def log-level (if (> (length args) 3) :debug :normal))
   (setdyn :grapple/log-level log-level)
-  (setdyn :grapple/log? true)
   (def s (start :host host :port port)))

@@ -38,7 +38,7 @@
 (deftest server-up-down
   (def actual-1 @"")
   (def actual-2 @"")
-  (with-dyns [:out actual-1 :err actual-2 :grapple/log? true]
+  (with-dyns [:out actual-1 :err actual-2 :grapple/log-level :normal]
     (def server (s/start))
     (s/stop server))
   (def expect-1 "Server starting on port 3737...\nServer stopping...\n")
@@ -174,7 +174,7 @@
                  "done" true})
   (is (== expect-6 actual-6))
   (def actual-7 @"")
-  (with-dyns [:out actual-7 :grapple/log? true]
+  (with-dyns [:out actual-7 :grapple/log-level :normal]
     (c/disconnect conn)
     (set client nil)
     (s/stop server)
