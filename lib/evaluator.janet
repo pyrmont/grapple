@@ -1,6 +1,19 @@
 (import ./utilities :as util)
 
 
+(def- root-env
+  (do
+    (defn make-env [&opt parent]
+      (default parent root-env)
+      (table/setproto @{} parent))
+    (def new-root (table/clone root-env))
+    (put-in new-root ['root-env :value] new-root)
+    (put-in new-root ['make-env :value] make-env)
+    (put-in new-root ['stdout :value] (fn :out [x] (xprin (dyn :out) x)))
+    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :err) x)))
+    new-root))
+
+
 (defn- stack [f]
   (map (fn [fr] {:name (fr :name)
                  :path (fr :source)
@@ -62,6 +75,10 @@
     (send-note full-msg details)))
 
 
+(defn new-env []
+  (make-env root-env))
+
+
 # based on run-context
 (defn run [code &named env parser path req send]
   (unless (and env req send)
@@ -101,7 +118,7 @@
           (setdyn :err out-2)
           (setdyn :module-make-env
                   (fn maker []
-                    (def env (make-env))
+                    (def env (new-env))
                     (put env :out out-1)
                     (put env :err out-2)
                     (put env :module-make-env maker)))

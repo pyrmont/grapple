@@ -25,7 +25,7 @@
 
 (deftest run-succeed-calculation
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(+ 1 2)" :env env :send send :req req))
   (is (nil? actual-1))
@@ -47,7 +47,7 @@
 
 (deftest run-succeed-output
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(print \"Hello world\")" :env env :send send :req req))
   (is (nil? actual-1))
@@ -77,9 +77,41 @@
   (is (zero? (ev/count chan))))
 
 
+(deftest run-succeed-stdout
+  (def [recv send chan] (make-stream))
+  (def env (e/new-env))
+  (def actual-1
+    (e/run "(xprint stdout \"Hello world\")" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-2
+    {"tag" "out"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "ch" "out"
+     "val" "Hello world\n"})
+  (is (== expect-2 actual-2))
+  (def actual-3 (recv))
+  (def expect-3
+    {"tag" "ret"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "done" false
+     "val" "nil"
+     "janet/path" u/ns
+     "janet/line" 1
+     "janet/col" 1})
+  (is (== expect-3 actual-3))
+  (is (zero? (ev/count chan))))
+
+
 (deftest run-fail-parser
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(print \"Hello world\"" :env env :send send :req req))
   (is (nil? actual-1))
@@ -101,7 +133,7 @@
 
 (deftest run-fail-compiler-1
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(foo)" :env env :send send :req req))
   (is (nil? actual-1))
@@ -123,7 +155,7 @@
 
 (deftest run-fail-compiler-2
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(defmacro foo [x] (x)) (foo 1)" :env env :send send :req req))
   (is (nil? actual-1))
@@ -157,7 +189,7 @@
 
 (deftest run-fail-runtime
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(+ 1 nil)" :env env :send send :req req))
   (is (nil? actual-1))
@@ -180,7 +212,7 @@
 
 (deftest run-warn-compiler
   (def [recv send chan] (make-stream))
-  (def env (make-env))
+  (def env (e/new-env))
   (def actual-1
     (e/run "(def x :deprecated 1) (inc x)" :env env :send send :req req))
   (is (nil? actual-1))
