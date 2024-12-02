@@ -1,19 +1,19 @@
+(import ./utilities :as u)
 (import ./transport :as t)
 (import ./server :as s)
 
 
-(defn connect [&named host port quiet?]
+(defn connect [&named host port]
   (default host s/default-host)
   (default port s/default-port)
-  (def [success? res] (protect (net/connect host port)))
-  (if success?
+  (def [ok? res] (protect (net/connect host port)))
+  (if ok?
     (let [conn res
           recv (t/make-recv conn)
           send (t/make-send conn)]
       [recv send conn])
     (do
-      (unless quiet?
-        (print res))
+      (u/log res)
       [nil nil nil])))
 
 

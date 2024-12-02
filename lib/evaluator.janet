@@ -38,7 +38,7 @@
     (if (= :dead fs)
       (do
         (put env '_ @{:value x})
-        (send-ret (util/literalise x)
+        (send-ret (string/format "%q" x)
                   {"done" false
                    "janet/path" where
                    "janet/line" line

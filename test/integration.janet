@@ -19,7 +19,7 @@
   (if client
     (c/disconnect client))
   (if server
-    (s/stop server :quiet? true)))
+    (s/stop server)))
 
 
 # Utility functions
@@ -38,8 +38,8 @@
 (deftest server-up-down
   (def actual-1 @"")
   (def actual-2 @"")
-  (with-dyns [:out actual-1 :err actual-2]
-    (def server (s/start :quiet))
+  (with-dyns [:out actual-1 :err actual-2 :grapple/log? true]
+    (def server (s/start))
     (s/stop server))
   (def expect-1 "Server starting on port 3737...\nServer stopping...\n")
   (is (== expect-1 actual-1))
@@ -52,8 +52,8 @@
     (def req (recv))
     (def {"id" req-id "sess" sess-id "op" op} req)
     (send {"tag" "ok"}))
-  (set server (s/start :handler handler :quiet? true))
-  (def [recv send conn] (c/connect :quiet? true))
+  (set server (s/start :handler handler))
+  (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (send {"lang" u/lang "id" "1"})
   (def actual (recv))
@@ -68,8 +68,8 @@
       (def req (recv))
       (if (nil? req) (break))
       (send req)))
-  (set server (s/start :handler handler :quiet? true))
-  (def [recv send conn] (c/connect :quiet? true))
+  (set server (s/start :handler handler))
+  (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (set client conn)
   (each id [1 2 3 4 5]
@@ -87,8 +87,8 @@
       (def req (recv))
       (if (nil? req) (break))
       (h/handle req sessions send)))
-  (set server (s/start :handler handler :quiet? true))
-  (def [recv send conn] (c/connect :quiet? true))
+  (set server (s/start :handler handler))
+  (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (set client conn)
   (send {"op" "sess/new"
@@ -174,7 +174,7 @@
                  "done" true})
   (is (== expect-6 actual-6))
   (def actual-7 @"")
-  (with-dyns [:out actual-7]
+  (with-dyns [:out actual-7 :grapple/log? true]
     (c/disconnect conn)
     (set client nil)
     (s/stop server)

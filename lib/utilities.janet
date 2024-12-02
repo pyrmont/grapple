@@ -4,8 +4,19 @@
 (def ns "<mrepl>")
 
 
-(defn literalise [val]
-  (string/format "%q" val))
+(def- levels {:normal 1 :debug 2})
+
+
+(defn log [v &opt level]
+  (default level :normal)
+  (when (dyn :grapple/log?)
+    (def msg (if (string? v) v (string/format "%q" v)))
+    (def msg-level (levels level))
+    (def want-level (levels (dyn :grapple/log-level)))
+    (when (>= want-level msg-level)
+      (if (= :debug (dyn :grapple/log-level))
+        (xprintf stdout "[DBG] %s" msg)
+        (print msg)))))
 
 
 (defn make-send-err [req send]

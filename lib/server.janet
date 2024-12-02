@@ -1,3 +1,4 @@
+(import ./utilities :as u)
 (import ./handler :as h)
 (import ./transport :as t)
 
@@ -6,43 +7,48 @@
 (def default-port 3737)
 
 
-(defn- make-default-handler [sessions quiet?]
+(defn- make-default-handler [sessions]
   (fn :handler [conn]
-    (unless quiet?
-      (print "Connection opened"))
+    (u/log "Connection opened")
     (def recv (t/make-recv conn))
     (def send (t/make-send conn))
     (forever
       (def req (recv))
       (if (nil? req) (break))
+      (u/log req :debug)
       (h/handle req sessions send))
-    (unless quiet?
-      (print "Connection closed"))))
+    (u/log "Connection closed")))
 
 
-(defn start [&named host port handler quiet?]
+(defn start [&named host port handler]
   (def sessions @{:count 0 :clients: @{}})
 
   (default host default-host)
   (default port default-port)
-  (default handler (make-default-handler sessions quiet?))
+  (default handler (make-default-handler sessions))
 
-  (unless quiet?
-    (print "Server starting on port " port "..."))
+  (u/log (string "Server starting on port " port "..."))
   (def s (net/listen host port))
   (ev/go
     (fn :server []
-      (protect (net/accept-loop s handler))))
+      (try
+        (net/accept-loop s handler)
+        ([e fib]
+         (if (= "stream is closed" e)
+           (break)
+           (propagate e fib))))))
   s)
 
 
-(defn stop [s &named quiet?]
-  (unless quiet?
-    (print "Server stopping..."))
+(defn stop [s]
+  (u/log "Server stopping...")
   (:close s))
 
 
 (defn main [& args]
   (def host (when (> (length args) 1) (args 1)))
   (def port (when (> (length args) 2) (args 2)))
+  (def log-level (when (> (length args) 3) :debug))
+  (setdyn :grapple/log-level log-level)
+  (setdyn :grapple/log? true)
   (def s (start :host host :port port)))
