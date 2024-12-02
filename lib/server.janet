@@ -34,7 +34,7 @@
       (try
         (net/accept-loop s handler)
         ([e fib]
-         (if (= "stream is closed" e)
+         (if (= "stream is closed" e) # TODO: reconsider this
            (break)
            (propagate e fib))))))
   s)
