@@ -21,7 +21,7 @@
 
 
 (defn start [&named host port handler]
-  (def sessions @{:count 0 :clients: @{}})
+  (def sessions @{:count 0 :clients @{}})
 
   (default host default-host)
   (default port default-port)

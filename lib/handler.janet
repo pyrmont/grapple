@@ -198,5 +198,6 @@
         "env/cmpl" (env-cmpl req sns send-ret send-err))
       # return value
       true)
-    ([e]
+    ([e f]
+     # (debug/stacktrace f)
      (send-err (string "request failed: " e)))))
