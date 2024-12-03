@@ -9,8 +9,8 @@
       (table/setproto @{} parent))
     (put-in new-root ['root-env :value] new-root)
     (put-in new-root ['make-env :value] make-eval-env)
-    (put-in new-root ['stdout :value] (fn :out [x] (xprin (dyn :out) x)))
-    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :err) x)))))
+    (put-in new-root ['stdout :value] (fn :out [x] (xprin (dyn :grapple/out) x)))
+    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :grapple/err) x)))))
 
 
 (defn- stack [f]
@@ -74,8 +74,13 @@
     (send-note full-msg details)))
 
 
-(defn new-env []
-  (make-env root-env))
+(defn new-env [&opt out err parent]
+  (def env (make-env parent))
+  (put env :out out)
+  (put env :grapple/out out)
+  (put env :err err)
+  (put env :grapple/err err)
+  (put env *module-make-env* (fn :maker [] (new-env out err))))
 
 
 # based on run-context
@@ -107,20 +112,13 @@
 
   # Evaluate 1 source form in a protected manner
   (def lints @[])
+  (def eval1-env (new-env out-1 out-2 env))
   (defn eval1 [source &opt l c]
     (var good true)
     (var resumeval nil)
     (def f
       (fiber/new
         (fn []
-          (setdyn :out out-1)
-          (setdyn :err out-2)
-          (setdyn :module-make-env
-                  (fn maker []
-                    (def env (new-env))
-                    (put env :out out-1)
-                    (put env :err out-2)
-                    (put env :module-make-env maker)))
           (array/clear lints)
           (def res (compile source env where lints))
           (unless (empty? lints)
@@ -145,7 +143,7 @@
                 (def {:error err :line line :column column :fiber errf} res)
                 (on-compile-error err errf where (or line l) (or column c))))))
         guard
-        env))
+        eval1-env))
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
       (when good
