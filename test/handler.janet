@@ -210,7 +210,7 @@
 
 (deftest env-load
   (def [recv send chan] (make-stream))
-  (def path "test/resources/handler-env-load.txt")
+  (def path "./res/test/handler-env-load.janet")
   (h/handle {"op" "env/load"
              "lang" u/lang
              "id" "1"
