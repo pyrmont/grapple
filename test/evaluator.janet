@@ -12,6 +12,11 @@
    chan])
 
 
+(defn teardown [t]
+  (t)
+  (table/clear module/cache))
+
+
 # Generic eval request
 
 (def req
@@ -109,11 +114,11 @@
   (is (zero? (ev/count chan))))
 
 
-(deftest run-succeed-import
+(deftest run-succeed-import-direct
   (def [recv send chan] (make-stream))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(import ./res/test/imported)" :env env :send send :req req))
+    (e/run "(import ./res/test/imported1)" :env env :send send :req req))
   (is (nil? actual-1))
   (def actual-2 (recv))
   (def expect-2
@@ -126,7 +131,40 @@
      "val" "Imported world\n"})
   (is (== expect-2 actual-2))
   (def actual-3 (recv))
-  (def expect-3-val "@{_ @{:value <cycle 0>} imported/x @{:private true}}")
+  (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true}}")
+  (def expect-3
+    {"tag" "ret"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "done" false
+     "val" expect-3-val
+     "janet/path" u/ns
+     "janet/line" 1
+     "janet/col" 1})
+  (is (== expect-3 actual-3))
+  (is (zero? (ev/count chan))))
+
+
+(deftest run-succeed-import-transitive
+  (def [recv send chan] (make-stream))
+  (def env (e/eval-make-env))
+  (def actual-1
+    (e/run "(import ./res/test/imported2)" :env env :send send :req req))
+  (is (nil? actual-1))
+  (def actual-2 (recv))
+  (def expect-2
+    {"tag" "out"
+     "op" "env/eval"
+     "lang" u/lang
+     "req" "1"
+     "sess" "1"
+     "ch" "out"
+     "val" "Imported world\n"})
+  (is (== expect-2 actual-2))
+  (def actual-3 (recv))
+  (def expect-3-val "@{_ @{:value <cycle 0>}}")
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -287,4 +325,5 @@
   (is (zero? (ev/count chan))))
 
 
+(use-fixtures :each teardown)
 (run-tests!)
