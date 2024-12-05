@@ -1,16 +1,66 @@
 (import ./utilities :as util)
 
 
-(def- eval-root
+(defn- dprint [v]
+  (xprintf stdout "%q" v))
+
+
+(defn- rebind [env sym new-val]
+  (def bndg (table/clone (env sym)))
+  (put bndg :value new-val)
+  (put env sym bndg))
+
+
+(def- eval-root-env
   (do
-    (def new-root (table/clone root-env))
-    (defn make-eval-env [&opt parent]
-      (default parent new-root)
+    (def new-env (table/clone root-env))
+
+    (defn new-make-env [&opt parent]
+      (default parent new-env)
       (table/setproto @{} parent))
-    (put-in new-root ['root-env :value] new-root)
-    (put-in new-root ['make-env :value] make-eval-env)
-    (put-in new-root ['stdout :value] (fn :out [x] (xprin (dyn :grapple/out) x)))
-    (put-in new-root ['stderr :value] (fn :err [x] (xprin (dyn :grapple/err) x)))))
+
+    (defmacro new-import [path & args]
+      (def ps (partition 2 args))
+      (def argm (mapcat (fn [[k v]] [k (case k :as (string v) :only ~(quote ,v) v)]) ps))
+      (tuple 'import* (string path) ;argm))
+
+    (defn new-import* [path & args]
+      (def env (table/getproto (curenv)))
+      (def kargs (table ;args))
+      (def {:as as
+            :prefix prefix
+            :export ep
+            :only only} kargs)
+      (defn extract-binds [reqenv]
+        (if (reqenv :grapple/eval-env?)
+          (do
+            (def parent (table/getproto reqenv))
+            (each sym (all-bindings reqenv true)
+              (put parent sym (reqenv sym)))
+            parent)
+          reqenv))
+      (def newenv (extract-binds (require path ;args)))
+      (def prefix (or
+                    (and as (string as "/"))
+                    prefix
+                    (string (last (string/split "/" path)) "/")))
+      (merge-module env newenv prefix ep only))
+
+    (defmacro new-use [& modules]
+      ~(do ,;(map |~(,import* ,(string $) :prefix "") modules)))
+
+    (rebind new-env 'root-env new-env)
+    (rebind new-env 'make-env new-make-env)
+    (rebind new-env 'import* new-import*)
+    (rebind new-env 'import new-import)
+    (rebind new-env 'use new-use)
+    (rebind new-env 'stdout (fn [& args] (xprin (dyn :out) ;args)))
+    (rebind new-env 'stderr (fn [& args] (xprin (dyn :err) ;args)))
+
+    (put new-env :module-make-env new-make-env)
+    (put new-env :out (fn :out [x] (error "tried to output")))
+    (put new-env :err (fn :err [x] (error "tried to output")))
+    new-env))
 
 
 (defn- stack [f]
@@ -74,13 +124,9 @@
     (send-note full-msg details)))
 
 
-(defn new-env [&opt out err parent]
-  (def env (make-env parent))
-  (put env :out out)
-  (put env :grapple/out out)
-  (put env :err err)
-  (put env :grapple/err err)
-  (put env *module-make-env* (fn :maker [] (new-env out err))))
+(defn eval-make-env [&opt parent]
+  (default parent eval-root-env)
+  (def env (make-env parent)))
 
 
 # based on run-context
@@ -92,6 +138,17 @@
   (def out-1 (util/make-send-out req send "out"))
   (def out-2 (util/make-send-out req send "err"))
   (def ret (util/make-send-ret req send))
+
+  (defn module-make-env [&opt parent no-wrap?]
+    (default parent eval-root-env)
+    (def new-env (if no-wrap? parent (table/setproto @{} parent)))
+    (def new-eval-env @{:out out-1
+                        :err out-2
+                        :module-make-env module-make-env
+                        :grapple/eval-env? true})
+    (table/setproto new-eval-env new-env))
+
+  (def eval1-env (module-make-env env true))
 
   (def on-status (debugger-on-status env 1 ret err))
   (def on-compile-error (bad-compile err))
@@ -112,7 +169,6 @@
 
   # Evaluate 1 source form in a protected manner
   (def lints @[])
-  (def eval1-env (new-env out-1 out-2 env))
   (defn eval1 [source &opt l c]
     (var good true)
     (var resumeval nil)
@@ -154,7 +210,7 @@
     (def f (coro
              (setdyn :err err)
              (on-parse-error p where)))
-    (fiber/setenv f env)
+    (fiber/setenv f eval1-env)
     (resume f))
 
   (defn prod-and-eval [p]
@@ -183,4 +239,5 @@
     (when (= :error (parser/status p))
       (parse-err p where)))
 
+  # TODO: Should this return env as the alternative?
   (in eval1-env :exit-value))
