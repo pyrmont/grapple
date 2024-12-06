@@ -43,14 +43,14 @@
 
 (deftest sess-new
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "sess/new"
+  (h/handle {"op" "sess.new"
              "lang" u/lang
              "id" "1"}
             sessions
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "sess/new"
+               "op" "sess.new"
                "lang" u/lang
                "req" "1"
                "sess" "2"
@@ -67,7 +67,7 @@
 
 (deftest sess-end
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "sess/end"
+  (h/handle {"op" "sess.end"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -75,7 +75,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "sess/end"
+               "op" "sess.end"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -88,7 +88,7 @@
 (deftest sess-list
   (def [recv send chan] (make-stream))
   (put (sessions :clients) "2" true)
-  (h/handle {"op" "sess/list"
+  (h/handle {"op" "sess.list"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -96,7 +96,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "sess/list"
+               "op" "sess.list"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -108,7 +108,7 @@
 
 (deftest serv-info
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv/info"
+  (h/handle {"op" "serv.info"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -116,7 +116,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv/info"
+               "op" "serv.info"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -133,7 +133,7 @@
 
 (deftest serv-stop
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv/stop"
+  (h/handle {"op" "serv.stop"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -141,7 +141,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv/stop"
+               "op" "serv.stop"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -153,7 +153,7 @@
 
 (deftest serv-relo
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv/relo"
+  (h/handle {"op" "serv.relo"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -161,7 +161,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv/relo"
+               "op" "serv.relo"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -173,7 +173,7 @@
 
 (deftest env-eval
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "env/eval"
+  (h/handle {"op" "env.eval"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -183,13 +183,13 @@
             send)
   (def actual-1 (do (recv) (recv)))
   (def expect-1 {"tag" "ret"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
                  "done" true})
   (is (== expect-1 actual-1))
-  (h/handle {"op" "env/eval"
+  (h/handle {"op" "env.eval"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -199,7 +199,7 @@
             send)
   (def actual-2 (recv))
   (def expect-2 {"tag" "err"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -211,7 +211,7 @@
 (deftest env-load
   (def [recv send chan] (make-stream))
   (def path "./res/test/handler-env-load.janet")
-  (h/handle {"op" "env/load"
+  (h/handle {"op" "env.load"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -220,13 +220,13 @@
             send)
   (def actual-1 (do (recv) (recv) (recv)))
   (def expect-1 {"tag" "ret"
-                 "op" "env/load"
+                 "op" "env.load"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
                  "done" true})
   (is (== expect-1 actual-1))
-  (h/handle {"op" "env/load"
+  (h/handle {"op" "env.load"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -236,7 +236,7 @@
   (def actual-2 (recv))
   (def expect-msg "request failed: could not open file path/to/nowhere.txt")
   (def expect-2 {"tag" "err"
-                 "op" "env/load"
+                 "op" "env.load"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -249,7 +249,7 @@
   (def [recv send chan] (make-stream))
   (def env @{'x @{:doc "The number five." :value 5}})
   (put module/cache u/ns env)
-  (h/handle {"op" "env/doc"
+  (h/handle {"op" "env.doc"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -261,7 +261,7 @@
   (put module/cache u/ns nil)
   (def actual-1 (recv))
   (def expect-1 {"tag" "ret"
-                 "op" "env/doc"
+                 "op" "env.doc"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -269,7 +269,7 @@
                  "val" "The number five."
                  "janet/type" :number})
   (is (== expect-1 actual-1))
-  (h/handle {"op" "env/doc"
+  (h/handle {"op" "env.doc"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -280,7 +280,7 @@
             send)
   (def actual-2 (recv))
   (def expect-2 {"tag" "err"
-                 "op" "env/doc"
+                 "op" "env.doc"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -294,7 +294,7 @@
   (def env @{'foo1 @{:value 1}
              'foo2 @{:value 2}})
   (put module/cache u/ns env)
-  (h/handle {"op" "env/cmpl"
+  (h/handle {"op" "env.cmpl"
              "lang" u/lang
              "id" "1"
              "sess" "1"
@@ -306,7 +306,7 @@
   (put module/cache u/ns nil)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "env/cmpl"
+               "op" "env.cmpl"
                "lang" u/lang
                "req" "1"
                "sess" "1"

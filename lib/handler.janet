@@ -6,17 +6,17 @@
 
 
 (def ops
-  {"sess/new" {:req ["lang" "id"]}
-   "sess/end" {:req ["lang" "id" "sess"]}
-   "sess/list" {:req ["lang" "id" "sess"]}
-   "serv/info" {:req ["lang" "id" "sess"]}
-   "serv/stop" {:req ["lang" "id" "sess"]}
-   "serv/relo" {:req ["lang" "id" "sess"]}
-   "env/eval" {:req ["lang" "id" "sess" "code" "ns"]}
-   "env/load" {:req ["lang" "id" "sess" "path"]}
-   "env/stop" {:req ["lang" "id" "sess" "req"]}
-   "env/doc" {:req ["lang" "id" "sess" "sym" "ns"]}
-   "env/cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}})
+  {"sess.new" {:req ["lang" "id"]}
+   "sess.end" {:req ["lang" "id" "sess"]}
+   "sess.list" {:req ["lang" "id" "sess"]}
+   "serv.info" {:req ["lang" "id" "sess"]}
+   "serv.stop" {:req ["lang" "id" "sess"]}
+   "serv.relo" {:req ["lang" "id" "sess"]}
+   "env.eval" {:req ["lang" "id" "sess" "code" "ns"]}
+   "env.load" {:req ["lang" "id" "sess" "path"]}
+   "env.stop" {:req ["lang" "id" "sess" "req"]}
+   "env.doc" {:req ["lang" "id" "sess" "sym" "ns"]}
+   "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}})
 
 
 (defn confirm [req ks send-err]
@@ -185,17 +185,17 @@
         (send-err "unsupported language version")
         (break false))
       (case op
-        "sess/new" (sess-new req sns send-ret send-err)
-        "sess/end" (sess-end req sns send-ret send-err)
-        "sess/list" (sess-list req sns send-ret send-err)
-        "serv/info" (serv-info req sns send-ret send-err)
-        "serv/stop" (serv-stop req sns send-ret send-err)
-        "serv/relo" (serv-relo req sns send-ret send-err)
-        "env/eval" (env-eval req sns send-ret send-err send)
-        "env/load" (env-load req sns send-ret send-err send)
-        "env/stop" (send-err "operation not implemented")
-        "env/doc" (env-doc req sns send-ret send-err)
-        "env/cmpl" (env-cmpl req sns send-ret send-err))
+        "sess.new" (sess-new req sns send-ret send-err)
+        "sess.end" (sess-end req sns send-ret send-err)
+        "sess.list" (sess-list req sns send-ret send-err)
+        "serv.info" (serv-info req sns send-ret send-err)
+        "serv.stop" (serv-stop req sns send-ret send-err)
+        "serv.relo" (serv-relo req sns send-ret send-err)
+        "env.eval" (env-eval req sns send-ret send-err send)
+        "env.load" (env-load req sns send-ret send-err send)
+        "env.stop" (send-err "operation not implemented")
+        "env.doc" (env-doc req sns send-ret send-err)
+        "env.cmpl" (env-cmpl req sns send-ret send-err))
       # return value
       true)
     ([e f]

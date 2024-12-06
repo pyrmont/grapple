@@ -25,7 +25,7 @@
 # Utility functions
 
 (defn handshake [recv send]
-  (def req {"lang" u/lang "id" "1" "op" "sess/new"})
+  (def req {"lang" u/lang "id" "1" "op" "sess.new"})
   (send req))
 
 
@@ -91,12 +91,12 @@
   (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (set client conn)
-  (send {"op" "sess/new"
+  (send {"op" "sess.new"
          "lang" u/lang
          "id" "1"})
   (def actual-1 (recv))
   (def expect-1 {"tag" "ret"
-                 "op" "sess/new"
+                 "op" "sess.new"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -108,20 +108,20 @@
                         "arch" (string (os/arch))
                         "serv" u/proj}})
   (is (== expect-1 actual-1))
-  (send {"op" "sess/list"
+  (send {"op" "sess.list"
          "lang" u/lang
          "id" "1"
          "sess" "1"})
   (def actual-2 (recv))
   (def expect-2 {"tag" "ret"
-                 "op" "sess/list"
+                 "op" "sess.list"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
                  "done" true
                  "val" ["1"]})
   (is (== expect-2 actual-2))
-  (send {"op" "env/eval"
+  (send {"op" "env.eval"
          "lang" u/lang
          "id" "1"
          "sess" "1"
@@ -129,7 +129,7 @@
          "code" "(def a 5)"})
   (def actual-3 (recv))
   (def expect-3 {"tag" "ret"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -141,13 +141,13 @@
   (is (== expect-3 actual-3))
   (def actual-4 (recv))
   (def expect-4 {"tag" "ret"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
                  "done" true})
   (is (== expect-4 actual-4))
-  (send {"op" "env/eval"
+  (send {"op" "env.eval"
          "lang" u/lang
          "id" "1"
          "sess" "1"
@@ -155,7 +155,7 @@
          "code" "(inc a)"})
   (def actual-5 (recv))
   (def expect-5 {"tag" "ret"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
@@ -167,7 +167,7 @@
   (is (== expect-5 actual-5))
   (def actual-6 (recv))
   (def expect-6 {"tag" "ret"
-                 "op" "env/eval"
+                 "op" "env.eval"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
