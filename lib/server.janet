@@ -8,13 +8,14 @@
 
 
 (defn- make-default-handler [sessions]
+  (def log-level (dyn :grapple/log-level))
   (fn :handler [conn]
+    (setdyn :grapple/log-level log-level)
     (u/log "Connection opened")
     (def recv (t/make-recv conn))
     (def send (t/make-send conn))
     (forever
       (def req (recv))
-      (xprintf stdout "woo")
       (u/log req)
       (if (nil? req) (break))
       (h/handle req sessions send))
