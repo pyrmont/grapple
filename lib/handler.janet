@@ -91,7 +91,7 @@
     (send-err "path must be string"))
   (def eval-env (or (module/cache ns)
                     (do
-                      (def new-env (make-env))
+                      (def new-env (eval/eval-make-env))
                       (put module/cache ns new-env)
                       new-env)))
   (def res (eval/run code
