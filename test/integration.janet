@@ -101,12 +101,11 @@
                  "req" "1"
                  "sess" "1"
                  "done" true
-                 "val" {"prot" u/prot
-                        "lang" u/lang
-                        "impl" (string "janet/" janet/version)
-                        "os" (string (os/which))
-                        "arch" (string (os/arch))
-                        "serv" u/proj}})
+                 "janet/arch" (string (os/arch))
+                 "janet/impl" ["janet" janet/version]
+                 "janet/os" (string (os/which))
+                 "janet/prot" (string/split "/" u/prot)
+                 "janet/serv" (string/split "/" u/proj)})
   (is (== expect-1 actual-1))
   (send {"op" "sess.list"
          "lang" u/lang

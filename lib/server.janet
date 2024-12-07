@@ -14,8 +14,9 @@
     (def send (t/make-send conn))
     (forever
       (def req (recv))
+      (xprintf stdout "woo")
+      (u/log req)
       (if (nil? req) (break))
-      (u/log req :debug)
       (h/handle req sessions send))
     (u/log "Connection closed")))
 

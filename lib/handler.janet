@@ -27,13 +27,13 @@
   true)
 
 
-(defn- info-msg []
-  {"prot" util/prot
-   "lang" util/lang
-   "impl" (string "janet/" janet/version)
-   "os" (os/which)
-   "arch" (os/arch)
-   "serv" util/proj})
+(def- info-kvs
+  {"janet/impl" ["janet" janet/version]
+   "janet/os" (os/which)
+   "janet/arch" (os/arch)
+   "janet/prot" (string/split "/" util/prot)
+   "janet/serv" (string/split "/" util/proj)})
+
 
 
 (defn- end-sess [sessions sess-id]
@@ -55,13 +55,13 @@
   (unless sess
     (send-err "failed to start session")
     (break))
-  (send-ret (info-msg) {"sess" sess}))
+  (send-ret nil (merge {"sess" sess} info-kvs)))
 
 
 (defn sess-end [req sns send-ret send-err]
   (def sess (req "sess"))
   (end-sess sns sess)
-  (send-ret "Session ended."))
+  (send-ret nil))
 
 
 (defn sess-list [req sns send-ret send-err]
@@ -69,7 +69,7 @@
 
 
 (defn serv-info [req sns send-ret send-err]
-  (send-ret (info-msg)))
+  (send-ret nil info-kvs))
 
 
 # TODO: implement

@@ -55,12 +55,11 @@
                "req" "1"
                "sess" "2"
                "done" true
-               "val" {"arch" (os/arch)
-                      "impl" (string "janet/" janet/version)
-                      "lang" u/lang
-                      "os" (os/which)
-                      "prot" u/prot
-                      "serv" u/proj}})
+               "janet/arch" (os/arch)
+               "janet/impl" ["janet" janet/version]
+               "janet/os" (os/which)
+               "janet/prot" (string/split "/" u/prot)
+               "janet/serv" (string/split "/" u/proj)})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -79,8 +78,7 @@
                "lang" u/lang
                "req" "1"
                "sess" "1"
-               "done" true
-               "val" "Session ended."})
+               "done" true})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -121,12 +119,11 @@
                "req" "1"
                "sess" "1"
                "done" true
-               "val" {"arch" (os/arch)
-                      "impl" (string "janet/" janet/version)
-                      "lang" u/lang
-                      "os" (os/which)
-                      "prot" u/prot
-                      "serv" u/proj}})
+               "janet/arch" (os/arch)
+               "janet/impl" ["janet" janet/version]
+               "janet/os" (os/which)
+               "janet/prot" (string/split "/" u/prot)
+               "janet/serv" (string/split "/" u/proj)})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
