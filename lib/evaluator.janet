@@ -19,6 +19,9 @@
       (default parent new-env)
       (table/setproto @{} parent))
 
+    (defn new-curenv [&opt n]
+      (curenv (if (dyn :grapple/eval-env?) 1)))
+
     (defmacro new-import [path & args]
       (def ps (partition 2 args))
       (def argm (mapcat (fn [[k v]] [k (case k :as (string v) :only ~(quote ,v) v)]) ps))
@@ -51,6 +54,7 @@
 
     (rebind new-env 'root-env new-env)
     (rebind new-env 'make-env new-make-env)
+    (rebind new-env 'curenv new-curenv)
     (rebind new-env 'import* new-import*)
     (rebind new-env 'import new-import)
     (rebind new-env 'use new-use)
