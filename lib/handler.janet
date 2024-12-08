@@ -120,23 +120,18 @@
 
 (defn env-doc [req sns send-ret send-err]
   (def {"sym" sym-str
-        "ns" ns
-        "janet/type" sym_t} req)
-  (def sym (case sym_t
-             "symbol" (symbol sym-str)
-             "keyword" (keyword sym-str)
-             sym-str))
+        "ns" ns} req)
+  (def sym (case (sym-str 0)
+             34 (string/slice sym-str 1 -2)
+             58 (keyword (string/slice sym-str 1))
+             (symbol sym-str)))
   (def eval-env (or (module/cache ns)
                     root-env))
   (def bind (eval-env sym))
   (if bind
     (send-ret (bind :doc) {"janet/type" (type (bind :value))
                            "janet/sm" (bind :source-map)})
-    (send-err (string (if sym_t sym_t "value")
-                      " "
-                      (if (= "keyword" sym_t) ":")
-                      sym-str
-                      " not found"))))
+    (send-err (string sym-str " not found"))))
 
 
 (defn env-cmpl [req sns send-ret send-err]

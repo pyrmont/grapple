@@ -281,7 +281,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" "symbol y not found"})
+                 "msg" "y not found"})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
