@@ -83,20 +83,27 @@
 
 
 (defn env-eval [req sns send-ret send-err send]
-  (def {"code" code "ns" ns "path" path} req)
+  (def {"code" code
+        "ns" ns
+        "line" line
+        "col" col} req)
   (unless (string? code)
     (send-err "code must be string")
     (break))
-  (unless (or (nil? path) (string? path))
-    (send-err "path must be string"))
+  (unless (or (nil? ns) (string? ns))
+    (send-err "ns must be string"))
   (def eval-env (or (module/cache ns)
                     (do
                       (def new-env (eval/eval-make-env))
                       (put module/cache ns new-env)
                       new-env)))
+  (def parser (parser/new))
+  (when (and line col)
+    (parser/where parser line col))
   (def res (eval/run code
                      :env eval-env
-                     :path path
+                     :parser parser
+                     :path ns
                      :send send
                      :req req))
   (send-ret res))
@@ -129,8 +136,9 @@
                     root-env))
   (def bind (eval-env sym))
   (if bind
-    (send-ret (bind :doc) {"janet/type" (type (bind :value))
-                           "janet/sm" (bind :source-map)})
+    (send-ret (or (bind :doc) "No documentation found.")
+              {"janet/type" (type (bind :value))
+               "janet/sm" (bind :source-map)})
     (send-err (string sym-str " not found"))))
 
 
