@@ -3,7 +3,7 @@
 (import ./transport :as t)
 
 
-(def default-host "0.0.0.0")
+(def default-host "127.0.0.1")
 (def default-port 3737)
 
 
@@ -29,7 +29,7 @@
   (default port default-port)
   (default handler (make-default-handler sessions))
 
-  (u/log (string "Server starting on port " port "..."))
+  (u/log (string "Server starting at " host " on port " port "..."))
   (def s (net/listen host port))
   (ev/go
     (fn :server []

@@ -31,8 +31,8 @@
   {"janet/impl" ["janet" janet/version]
    "janet/os" (os/which)
    "janet/arch" (os/arch)
-   "janet/prot" (string/split "/" util/prot)
-   "janet/serv" (string/split "/" util/proj)})
+   "janet/prot" util/prot
+   "janet/serv" util/proj})
 
 
 

@@ -58,8 +58,8 @@
                "janet/arch" (os/arch)
                "janet/impl" ["janet" janet/version]
                "janet/os" (os/which)
-               "janet/prot" (string/split "/" u/prot)
-               "janet/serv" (string/split "/" u/proj)})
+               "janet/prot" u/prot
+               "janet/serv" u/proj})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -122,8 +122,8 @@
                "janet/arch" (os/arch)
                "janet/impl" ["janet" janet/version]
                "janet/os" (os/which)
-               "janet/prot" (string/split "/" u/prot)
-               "janet/serv" (string/split "/" u/proj)})
+               "janet/prot" u/prot
+               "janet/serv" u/proj})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 

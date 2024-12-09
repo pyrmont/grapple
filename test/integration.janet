@@ -41,7 +41,7 @@
   (with-dyns [:out actual-1 :err actual-2 :grapple/log-level :normal]
     (def server (s/start))
     (s/stop server))
-  (def expect-1 "Server starting on port 3737...\nServer stopping...\n")
+  (def expect-1 "Server starting at 127.0.0.1 on port 3737...\nServer stopping...\n")
   (is (== expect-1 actual-1))
   (is (empty? actual-2)))
 
@@ -104,8 +104,8 @@
                  "janet/arch" (string (os/arch))
                  "janet/impl" ["janet" janet/version]
                  "janet/os" (string (os/which))
-                 "janet/prot" (string/split "/" u/prot)
-                 "janet/serv" (string/split "/" u/proj)})
+                 "janet/prot" u/prot
+                 "janet/serv" u/proj})
   (is (== expect-1 actual-1))
   (send {"op" "sess.list"
          "lang" u/lang
