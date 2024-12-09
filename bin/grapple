@@ -1,0 +1,4 @@
+#!/usr/bin/env janet
+(import grapple/lib/cli)
+
+(cli/run)

@@ -1,11 +1,15 @@
 (declare-project
   :name "Grapple"
-  :description "An mREPL server in Janet"
+  :description "An mREPL server for Janet"
   :author "Michael Camilleri"
   :license "MIT"
   :url "https://github.com/pyrmont/grapple"
   :repo "git+https://github.com/pyrmont/grapple"
-  :vendored [{:url "https://github.com/pyrmont/medea"
+  :vendored [{:url "https://github.com/pyrmont/argy-bargy"
+              :prefix "argy-bargy"
+              :include ["argy-bargy.janet"
+                        "LICENSE"]}
+             {:url "https://github.com/pyrmont/medea"
               :prefix "medea"
               :include ["medea"
                         "LICENSE"]}
@@ -13,6 +17,10 @@
               :prefix "testament"
               :include ["src/testament.janet"
                         "LICENSE"]}])
+
+
+(declare-binscript
+  :main "bin/grapple")
 
 
 (declare-source

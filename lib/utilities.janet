@@ -4,20 +4,18 @@
 (def ns "<mrepl>")
 
 
-(def- log-levels {:normal 1 :debug 2})
+(def- log-levels {:off 0 :normal 1 :debug 2})
 
 
-(defn log [msg &opt msg-lvl]
-  (default msg-lvl :normal)
-  (def l-lvl (dyn :grapple/log-level))
-  (when l-lvl
-    (def msg-s (if (string? msg) msg (string/format "%q" msg)))
-    (def msg-lvl-num (log-levels msg-lvl))
-    (def l-lvl-num (log-levels l-lvl))
-    (when (>= l-lvl-num msg-lvl-num)
-      (if (= :debug l-lvl)
-        (xprintf stdout "[DBG] %s" msg-s)
-        (print msg-s)))))
+(defn log [msg &opt level]
+  (default level :normal)
+  (def log-level (log-levels (dyn :grapple/log-level)))
+  (when log-level
+    (def msg-level (log-levels level))
+    (def s (if (string? msg) msg (string/format "%q" msg)))
+    (when (>= log-level msg-level)
+      (def prefix (if (= log-level 2) "[DBG] "))
+      (xprintf stdout (string prefix "%s") s))))
 
 
 (defn make-send-err [req send]
