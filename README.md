@@ -2,7 +2,7 @@
 
 Grapple is an mREPL server for Janet.
 
-**Caution**: Grapple is in an alpha stage of development.
+> :warning: **Warning:** Grapple is in an alpha stage of development.
 
 ## Features
 
