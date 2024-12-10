@@ -9,7 +9,7 @@
 
 (fn sess-end [conn opts]
   (conn.send {:op "sess.end"}
-             opts.action))
+             (if opts opts.action nil)))
 
 (fn sess-list [conn opts]
   (conn.send {:op "sess.list"}

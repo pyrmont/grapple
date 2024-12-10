@@ -8,7 +8,14 @@ local function sess_new(conn, opts)
   return conn.send({op = "sess.new"}, opts.action)
 end
 local function sess_end(conn, opts)
-  return conn.send({op = "sess.end"}, opts.action)
+  local function _2_()
+    if opts then
+      return opts.action
+    else
+      return nil
+    end
+  end
+  return conn.send({op = "sess.end"}, _2_())
 end
 local function sess_list(conn, opts)
   return conn.send({op = "sess.list"}, opts.action)
