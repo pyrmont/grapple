@@ -96,7 +96,7 @@ local function handle_message(msg, action)
     elseif ("env.eval" == msg.op) then
       return handle_env_eval(msg)
     elseif ("env.load" == msg.op) then
-      return __fnl_global__handle_2denv_2dload(msg)
+      return handle_env_eval(msg)
     elseif ("env.stop" == msg.op) then
       return __fnl_global__handle_2denv_2dstop(msg)
     elseif ("env.doc" == msg.op) then

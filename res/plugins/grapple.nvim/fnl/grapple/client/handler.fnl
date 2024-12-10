@@ -108,7 +108,7 @@
     (handle-env-eval msg)
 
     (= "env.load" msg.op)
-    (handle-env-load msg)
+    (handle-env-eval msg) ; OK?
 
     (= "env.stop" msg.op)
     (handle-env-stop msg)
