@@ -15,7 +15,7 @@
     (def s (if (string? msg) msg (string/format "%q" msg)))
     (when (>= log-level msg-level)
       (def prefix (if (= log-level 2) "[DBG] "))
-      (xprintf stdout (string prefix "%s") s))))
+      (printf (string prefix "%s") s))))
 
 
 (defn make-send-err [req send]
