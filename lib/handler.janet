@@ -169,7 +169,7 @@
     (if (= max (length matches))
       (set t nil)
       (set t (table/getproto t))))
-  (send-ret matches))
+  (send-ret (sort matches)))
 
 
 (defn handle [req sns send]
