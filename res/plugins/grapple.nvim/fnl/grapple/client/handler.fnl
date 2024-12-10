@@ -44,24 +44,26 @@
 (fn handle-env-doc [resp action]
   (if
     (= "doc" action)
-    (let [[path line col] resp.janet/sm
-         buf (vim.api.nvim_create_buf false true)
-         lines (n.concat [resp.janet/type
-                          (.. path " on line " line ", column " col)
-                          ""]
-                         (str.split resp.val "\n"))
-         _ (vim.api.nvim_buf_set_lines buf 0 -1 false lines)
-         width 50
-         height 10
-         win-opts {:relative "cursor"
-                   :width width
-                   :height height
-                   :col 0
-                   :row 1
-                   :anchor "NW"
-                   :style "minimal"
-                   :border "rounded"}
-         win (vim.api.nvim_open_win buf false win-opts)]
+    (let [buf (vim.api.nvim_create_buf false true)
+          sm-info (.. resp.janet/type
+                      "\n"
+                      (if (not resp.janet/sm)
+                        "\n"
+                        (let [[path line col] resp.janet/sm]
+                          (.. path " on line " line ", column " col "\n\n"))))
+          lines (str.split (.. sm-info resp.val) "\n")
+          _ (vim.api.nvim_buf_set_lines buf 0 -1 false lines)
+          width 50
+          height 10
+          win-opts {:relative "cursor"
+                    :width width
+                    :height height
+                    :col 0
+                    :row 1
+                    :anchor "NW"
+                    :style "minimal"
+                    :border "rounded"}
+          win (vim.api.nvim_open_win buf false win-opts)]
      (vim.api.nvim_buf_set_option buf "wrap" true)
      (vim.api.nvim_buf_set_option buf "linebreak" true)
      (vim.api.nvim_buf_set_option buf "filetype" "markdown")

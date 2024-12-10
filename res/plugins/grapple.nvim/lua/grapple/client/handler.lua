@@ -36,11 +36,19 @@ local function handle_env_eval(resp)
 end
 local function handle_env_doc(resp, action)
   if ("doc" == action) then
-    local path = resp["janet/sm"][1]
-    local line = resp["janet/sm"][2]
-    local col = resp["janet/sm"][3]
     local buf = vim.api.nvim_create_buf(false, true)
-    local lines = n.concat({resp["janet/type"], (path .. " on line " .. line .. ", column " .. col), ""}, str.split(resp.val, "\n"))
+    local sm_info
+    local _3_
+    if not resp["janet/sm"] then
+      _3_ = "\n"
+    else
+      local path = resp["janet/sm"][1]
+      local line = resp["janet/sm"][2]
+      local col = resp["janet/sm"][3]
+      _3_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+    end
+    sm_info = (resp["janet/type"] .. "\n" .. _3_)
+    local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
     local height = 10
@@ -49,12 +57,12 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_buf_set_option(buf, "wrap", true)
     vim.api.nvim_buf_set_option(buf, "linebreak", true)
     vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-    local function _3_()
+    local function _6_()
       vim.api.nvim_win_close(win, true)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {once = true, callback = _3_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {once = true, callback = _6_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
