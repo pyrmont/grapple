@@ -27,4 +27,6 @@
     (def payload (json/encode msg))
     (buffer/push-word buf (length payload))
     (buffer/push-string buf payload)
-    (:write stream buf)))
+    (if (buffer? stream) # hack because of how suspension works inside print
+      (buffer/push-string stream buf)
+      (:write stream buf))))

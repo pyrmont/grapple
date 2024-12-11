@@ -20,7 +20,7 @@
 
 (defn make-send-err [req send]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :sender [msg &opt details]
+  (fn :err-sender [msg &opt details]
     (def resp @{"tag" "err"
                 "op" op
                 "lang" lang
@@ -39,7 +39,7 @@
 
 (defn make-send-note [req send]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :sender [msg &opt details]
+  (fn :note-sender [msg &opt details]
     (def resp @{"tag" "note"
                 "op" op
                 "lang" lang
@@ -58,7 +58,7 @@
 
 (defn make-send-out [req send ch]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :sender [val]
+  (fn :out-sender [val]
     (send {"tag" "out"
            "op" op
            "lang" lang
@@ -70,7 +70,7 @@
 
 (defn make-send-ret [req send]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :sender [val &opt details]
+  (fn :ret-sender [val &opt details]
     (def resp @{"tag" "ret"
                 "op" op
                 "lang" lang

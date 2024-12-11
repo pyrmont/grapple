@@ -13,12 +13,15 @@
     (setdyn :grapple/log-level log-level)
     (u/log "Connection opened")
     (def recv (t/make-recv conn))
-    (def send (t/make-send conn))
+    (def buf @"")
+    (def sendb (t/make-send buf))
     (forever
       (def req (recv))
       (u/log req :debug)
       (if (nil? req) (break))
-      (h/handle req sessions send))
+      (h/handle req sessions sendb)
+      (:write conn buf)
+      (buffer/clear buf))
     (u/log "Connection closed")))
 
 

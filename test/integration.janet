@@ -84,11 +84,15 @@
 (deftest client-complex
   (def sessions @{:count 0 :clients @{}})
   (defn handler [conn]
-    (def [recv send] (make-streams conn))
+    (def [recv _] (make-streams conn))
+    (def buf @"")
+    (def sendb (t/make-send buf))
     (forever
       (def req (recv))
       (if (nil? req) (break))
-      (h/handle req sessions send)))
+      (h/handle req sessions sendb)
+      (:write conn buf)
+      (buffer/clear buf)))
   (set server (s/start :handler handler))
   (def [recv send conn] (c/connect))
   (is (and recv send conn))
@@ -174,14 +178,53 @@
                  "sess" "1"
                  "done" true})
   (is (== expect-6 actual-6))
-  (def actual-7 @"")
-  (with-dyns [:out actual-7 :grapple/log-level :normal]
-    (c/disconnect conn)
-    (set client nil)
-    (s/stop server)
-    (set server nil))
-  (def expect-7 "Server stopping...\n")
-  (is (== expect-7 actual-7)))
+  (send {"op" "env.eval"
+         "lang" u/lang
+         "id" "1"
+         "sess" "1"
+         "ns" "<mrepl>"
+         "code" "(defn x [] (print :foo) :bar) (x)"})
+  (def actual-7 (recv))
+  (def expect-7 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "<function x>"
+                 "janet/path" "<mrepl>"
+                 "janet/line" 1
+                 "janet/col" 1})
+  (is (== expect-7 actual-7))
+  (def actual-8 (recv))
+  (def expect-8 {"tag" "out"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "ch" "out"
+                 "val" "foo\n"})
+  (is (== expect-8 actual-8))
+  (def actual-9 (recv))
+  (def expect-9 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" ":bar"
+                 "janet/path" "<mrepl>"
+                 "janet/line" 1
+                 "janet/col" 31})
+  (is (== expect-9 actual-9))
+  (def actual-10 (recv))
+  (def expect-10 {"tag" "ret"
+                  "op" "env.eval"
+                  "lang" u/lang
+                  "req" "1"
+                  "sess" "1"
+                  "done" true})
+  (is (== expect-10 actual-10)))
 
 
 (use-fixtures :each teardown)
