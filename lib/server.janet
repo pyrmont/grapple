@@ -7,8 +7,7 @@
 (def default-port 3737)
 
 
-(defn- make-default-handler [sessions]
-  (def log-level (dyn :grapple/log-level))
+(defn- make-default-handler [sessions log-level]
   (fn :handler [conn]
     (setdyn :grapple/log-level log-level)
     (u/log "Connection opened")
@@ -25,13 +24,15 @@
     (u/log "Connection closed")))
 
 
-(defn start [&named host port handler]
+(defn start [&named host port handler log-level]
   (def sessions @{:count 0 :clients @{}})
 
   (default host default-host)
   (default port default-port)
-  (default handler (make-default-handler sessions))
+  (default log-level :normal)
+  (default handler (make-default-handler sessions log-level))
 
+  (setdyn :grapple/log-level log-level)
   (u/log (string "Server starting at " host " on port " port "..."))
   (def server (net/listen host port))
   (ev/go

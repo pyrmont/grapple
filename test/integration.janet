@@ -39,9 +39,8 @@
   (def actual-1 @"")
   (def actual-2 @"")
   (with-dyns [:out actual-1
-              :err actual-2
-              :grapple/log-level :normal]
-    (def server (s/start))
+              :err actual-2]
+    (def server (s/start :log-level :normal))
     (s/stop server))
   (def expect-1 "Server starting at 127.0.0.1 on port 3737...\nServer stopping...\n")
   (is (== expect-1 actual-1))
@@ -54,7 +53,7 @@
     (def req (recv))
     (def {"id" req-id "sess" sess-id "op" op} req)
     (send {"tag" "ok"}))
-  (set server (s/start :handler handler))
+  (set server (s/start :handler handler :log-level :none))
   (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (send {"lang" u/lang "id" "1"})
@@ -70,7 +69,7 @@
       (def req (recv))
       (if (nil? req) (break))
       (send req)))
-  (set server (s/start :handler handler))
+  (set server (s/start :handler handler :log-level :none))
   (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (set client conn)
@@ -93,7 +92,7 @@
       (h/handle req sessions sendb)
       (:write conn buf)
       (buffer/clear buf)))
-  (set server (s/start :handler handler))
+  (set server (s/start :handler handler :log-level :none))
   (def [recv send conn] (c/connect))
   (is (and recv send conn))
   (set client conn)

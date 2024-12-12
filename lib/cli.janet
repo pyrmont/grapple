@@ -53,8 +53,9 @@
 
     (do
       (def opts (args->opts parsed))
-      (setdyn :grapple/log-level (opts :log-level))
-      (server/start (opts :host) (opts :port)))))
+      (server/start :host (opts :host)
+                    :port (opts :port)
+                    :log-level (opts :log-level)))))
 
 
 # for testing in development
