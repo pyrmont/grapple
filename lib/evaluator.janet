@@ -62,6 +62,7 @@
     (rebind new-env 'stderr (fn [& args] (xprin (dyn :err) ;args)))
 
     (put new-env :redef true)
+    (put new-env :debug true)
     (put new-env :module-make-env new-make-env)
     (put new-env :out (fn :out [x] (error "tried to output")))
     (put new-env :err (fn :err [x] (error "tried to output")))
