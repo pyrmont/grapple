@@ -13,8 +13,12 @@
 (fn error-msg? [msg]
   (= "err" msg.tag))
 
-(fn display-error [msg]
-  (log.append [(.. "# ! " msg)]))
+(fn display-error [desc msg]
+  (log.append [(.. "# ! " desc)])
+  (when msg
+    (log.append [(.. "# ! in " msg.janet/path
+                     " on line " msg.janet/line
+                     " at col " msg.janet/col)])))
 
 (fn handle-sess-new [resp]
   (n.assoc (state.get :conn) :session resp.sess)
@@ -84,7 +88,7 @@
   (when msg
    (if
     (error-msg? msg)
-    (display-error msg.msg)
+    (display-error msg.val msg)
 
     (= "sess.new" msg.op)
     (handle-sess-new msg)

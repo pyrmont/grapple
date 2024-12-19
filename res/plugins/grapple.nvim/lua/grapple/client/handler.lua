@@ -14,8 +14,13 @@ end
 local function error_msg_3f(msg)
   return ("err" == msg.tag)
 end
-local function display_error(msg)
-  return log.append({("# ! " .. msg)})
+local function display_error(desc, msg)
+  log.append({("# ! " .. desc)})
+  if msg then
+    return log.append({("# ! in " .. msg["janet/path"] .. " on line " .. msg["janet/line"] .. " at col " .. msg["janet/col"])})
+  else
+    return nil
+  end
 end
 local function handle_sess_new(resp)
   n.assoc(state.get("conn"), "session", resp.sess)
@@ -38,16 +43,16 @@ local function handle_env_doc(resp, action)
   if ("doc" == action) then
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _3_
+    local _4_
     if not resp["janet/sm"] then
-      _3_ = "\n"
+      _4_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _3_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _4_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _3_)
+    sm_info = (resp["janet/type"] .. "\n" .. _4_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -57,12 +62,12 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_buf_set_option(buf, "wrap", true)
     vim.api.nvim_buf_set_option(buf, "linebreak", true)
     vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-    local function _6_()
+    local function _7_()
       vim.api.nvim_win_close(win, true)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {once = true, callback = _6_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {once = true, callback = _7_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -80,7 +85,7 @@ end
 local function handle_message(msg, action)
   if msg then
     if error_msg_3f(msg) then
-      return display_error(msg.msg)
+      return display_error(msg.val, msg)
     elseif ("sess.new" == msg.op) then
       return handle_sess_new(msg)
     elseif ("sess.end" == msg.op) then
