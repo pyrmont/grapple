@@ -30,13 +30,13 @@
 
 (deftest confirm
   (def [recv send chan] (make-stream))
-  (defn send-err [msg]
+  (defn send-err [val]
     (send {"tag" "err"
-           "msg" msg}))
+           "val" val}))
   (h/confirm {} ["id" "sess"] send-err)
   (def actual (recv))
   (def expect {"tag" "err"
-               "msg" "request missing key \"id\""})
+               "val" "request missing key \"id\""})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -200,7 +200,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" "code must be string"})
+                 "val" "code must be string"})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
@@ -237,7 +237,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" expect-msg})
+                 "val" expect-msg})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 
@@ -281,7 +281,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" "y not found"})
+                 "val" "y not found"})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 

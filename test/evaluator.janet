@@ -194,7 +194,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" expect-msg
+                 "val" expect-msg
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 20})
@@ -216,7 +216,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" expect-msg
+                 "val" expect-msg
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1})
@@ -249,7 +249,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" expect-msg
+                 "val" expect-msg
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 24
@@ -272,7 +272,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" expect-msg
+                 "val" expect-msg
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1
@@ -305,7 +305,7 @@
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "msg" "compile warning (normal): x is deprecated"
+                 "val" "compile warning (normal): x is deprecated"
                  "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1})

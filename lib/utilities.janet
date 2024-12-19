@@ -20,13 +20,13 @@
 
 (defn make-send-err [req send]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :err-sender [msg &opt details]
+  (fn :err-sender [val &opt details]
     (def resp @{"tag" "err"
                 "op" op
                 "lang" lang
                 "req" id
                 "sess" sess
-                "msg" msg})
+                "val" val})
     (send (cond
             (nil? details)
             resp
@@ -39,13 +39,13 @@
 
 (defn make-send-note [req send]
   (def {"op" op "id" id "sess" sess} req)
-  (fn :note-sender [msg &opt details]
+  (fn :note-sender [val &opt details]
     (def resp @{"tag" "note"
                 "op" op
                 "lang" lang
                 "req" id
                 "sess" sess
-                "msg" msg})
+                "val" val})
     (send (cond
             (nil? details)
             resp
