@@ -1,7 +1,7 @@
 -- [nfnl] Compiled from fnl/grapple/client/request.fnl by https://github.com/Olical/nfnl, do not edit.
 local _local_1_ = require("nfnl.module")
 local autoload = _local_1_["autoload"]
-local log = autoload("conjure.log")
+local log = autoload("grapple.client.log")
 local n = autoload("nfnl.core")
 local state = autoload("grapple.client.state")
 local function sess_new(conn, opts)

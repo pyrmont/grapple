@@ -1,5 +1,5 @@
 (local {: autoload} (require :nfnl.module))
-(local log (autoload :conjure.log))
+(local log (autoload :grapple.client.log))
 (local n (autoload :nfnl.core))
 (local state (autoload :grapple.client.state))
 
