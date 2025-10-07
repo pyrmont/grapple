@@ -1,6 +1,7 @@
 # This code assumes that messages received will not have a length
 # exceeding 2^32 - 1. Is this a safe assumption?
-(import ../deps/medea/medea :as json)
+(import ../deps/medea :as json)
+(import ./utilities :as u)
 
 
 (defn make-recv [stream]
@@ -17,7 +18,9 @@
       (:read stream len buf)
       (if-not (= len (length buf))
         (error "failed to read message payload"))
-      (json/decode buf))))
+      (def res (json/decode buf))
+      (u/log res :debug :in)
+      res)))
 
 
 (defn make-send [stream]
@@ -25,6 +28,7 @@
   (fn :sender [msg]
     (buffer/clear buf)
     (def payload (json/encode msg))
+    (u/log msg :debug :out)
     (buffer/push-word buf (length payload))
     (buffer/push-string buf payload)
     (if (buffer? stream) # hack because of how suspension works inside print

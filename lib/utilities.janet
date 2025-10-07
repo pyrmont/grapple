@@ -7,14 +7,22 @@
 (def- log-levels {:off 0 :normal 1 :debug 2})
 
 
-(defn log [msg &opt level]
+(defn log [msg &opt level io]
   (default level :normal)
   (def log-level (log-levels (dyn :grapple/log-level)))
   (when log-level
     (def msg-level (log-levels level))
     (def s (if (string? msg) msg (string/format "%q" msg)))
     (when (>= log-level msg-level)
-      (def prefix (if (= log-level 2) "[DBG] "))
+      (def prefix
+        (when (= log-level 2)
+          (case io
+            :in
+            "[DBG] (in) "
+            :out
+            "[DBG] (out) "
+            # default
+            "[DBG] ")))
       (printf (string prefix "%s") s))))
 
 

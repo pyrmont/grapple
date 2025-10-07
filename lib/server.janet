@@ -16,7 +16,6 @@
     (def sendb (t/make-send buf))
     (forever
       (def req (recv))
-      (u/log req :debug)
       (if (nil? req) (break))
       (h/handle req sessions sendb)
       (:write conn buf)
