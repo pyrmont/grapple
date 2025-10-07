@@ -1,8 +1,15 @@
 # Grapple
 
+[![Test Status][icon]][status]
+
+[icon]: https://github.com/pyrmont/grapple/workflows/test/badge.svg
+[status]: https://github.com/pyrmont/grapple/actions?query=workflow%3Atest
+
 Grapple is an mREPL server for Janet.
 
-> :warning: **Warning:** Grapple is in an alpha stage of development.
+> [!WARNING]
+> Jeep is in an alpha stage of development. There are likely to be bugs and
+> gaps in its implementation.
 
 ## Features
 
@@ -19,12 +26,23 @@ REPL protocol, similar to nREPL but with a simpler design.
 
 ## Installation
 
-Install via JPM:
+Install directly:
 
-```shell
-$ jpm install https://github.com/pyrmont/grapple
-$ grapple --help
+```console
+$ git clone https://github.com/pyrmont/grapple
+$ cd grapple
+$ janet -b .
+$ grapple -h
 ```
+
+Or using [Jeep][]:
+
+```console
+$ jeep install https://github.com/pyrmont/grapple
+$ grapple -h
+```
+
+[Jeep]: https://github.com/pyrmont/grapple
 
 ## Usage
 
@@ -33,10 +51,10 @@ $ grapple --help
 Grapple can be imported as a library into an existing project:
 
 ```janet
-(import grapple/lib/server)
+(import grapple)
 
 (setdyn :grapple/log-level :debug)
-(server/start "127.0.0.1" 3737)
+(grapple/server/start "127.0.0.1" 3737)
 ```
 
 Alternatively, Grapple's CLI utility can be used like this in your project

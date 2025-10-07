@@ -1,4 +1,4 @@
-(import /deps/testament/src/testament :prefix "" :exit true)
+(import /deps/testament :prefix "" :exit true)
 (import ../lib/utilities :as u)
 (import ../lib/transport :as t)
 (import ../lib/handler :as h)
@@ -11,16 +11,13 @@
 (var server nil)
 (var client nil)
 
-
 # Teardown function
 
-(defn teardown [t]
-  (t)
+(defn teardown []
   (if client
     (c/disconnect client))
   (if server
     (s/stop server)))
-
 
 # Utility functions
 
@@ -28,10 +25,8 @@
   (def req {"lang" u/lang "id" "1" "op" "sess.new"})
   (send req))
 
-
 (defn make-streams [conn]
   [(t/make-recv conn) (t/make-send conn)])
-
 
 # Tests
 
@@ -44,8 +39,8 @@
     (s/stop server))
   (def expect-1 "Server starting at 127.0.0.1 on port 3737...\nServer stopping...\n")
   (is (== expect-1 actual-1))
-  (is (empty? actual-2)))
-
+  (is (empty? actual-2))
+  (teardown))
 
 (deftest client-connect
   (defn handler [conn]
@@ -59,8 +54,8 @@
   (send {"lang" u/lang "id" "1"})
   (def actual (recv))
   (def expect {"tag" "ok"})
-  (is (== expect actual)))
-
+  (is (== expect actual))
+  (teardown))
 
 (deftest client-echo
   (defn handler [conn]
@@ -77,8 +72,8 @@
     (def expect {"lang" u/lang "id" id})
     (send expect)
     (def actual (recv))
-    (is (== expect actual))))
-
+    (is (== expect actual)))
+  (teardown))
 
 (deftest client-complex
   (def sessions @{:count 0 :clients @{}})
@@ -223,8 +218,7 @@
                   "req" "1"
                   "sess" "1"
                   "done" true})
-  (is (== expect-10 actual-10)))
+  (is (== expect-10 actual-10))
+  (teardown))
 
-
-(use-fixtures :each teardown)
 (run-tests!)

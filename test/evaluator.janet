@@ -1,21 +1,13 @@
-(import /deps/testament/src/testament :prefix "" :exit true)
+(import /deps/testament :prefix "" :exit true)
 (import ../lib/utilities :as u)
 (import ../lib/evaluator :as e)
 
-
 # Utility Functions
 
-(defn make-stream []
-  (def chan (ev/chan 5))
-  [(fn [] (ev/take chan))
-   (fn [v] (ev/give chan v))
-   chan])
-
-
-(defn teardown [t]
-  (t)
-  (table/clear module/cache))
-
+(defn make-sender [b]
+  (fn :send [v]
+    # use buffer becuase ev/give doesn't work in janet_call
+    (buffer/push b (string/format "%q" v))))
 
 # Generic eval request
 
@@ -25,16 +17,17 @@
    "id" "1"
    "sess" "1"})
 
-
 # Tests
 
 (deftest run-succeed-calculation
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(+ 1 2)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2
     {"tag" "ret"
      "op" "env/eval"
@@ -46,17 +39,19 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-succeed-output
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(print \"Hello world\")" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2
     {"tag" "out"
      "op" "env/eval"
@@ -65,8 +60,8 @@
      "sess" "1"
      "ch" "out"
      "val" "Hello world\n"})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -78,17 +73,19 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-succeed-stdout
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(xprint stdout \"Hello world\")" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2
     {"tag" "out"
      "op" "env/eval"
@@ -97,8 +94,8 @@
      "sess" "1"
      "ch" "out"
      "val" "Hello world\n"})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -110,17 +107,20 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-succeed-import-direct
-  (def [recv send chan] (make-stream))
+  (table/clear module/cache)
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(import ./res/test/imported1)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2
     {"tag" "out"
      "op" "env/eval"
@@ -129,8 +129,8 @@
      "sess" "1"
      "ch" "out"
      "val" "Imported world\n"})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true}}")
   (def expect-3
     {"tag" "ret"
@@ -143,17 +143,20 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-succeed-import-transitive
-  (def [recv send chan] (make-stream))
+  (table/clear module/cache)
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(import ./res/test/imported2)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2
     {"tag" "out"
      "op" "env/eval"
@@ -162,8 +165,8 @@
      "sess" "1"
      "ch" "out"
      "val" "Imported world\n"})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-3-val "@{_ @{:value <cycle 0>}}")
   (def expect-3
     {"tag" "ret"
@@ -176,17 +179,19 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-fail-parser
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(print \"Hello world\"" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-msg
     "parse error: unexpected end of source, ( opened at line 1, column 1")
   (def expect-2 {"tag" "err"
@@ -198,17 +203,19 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 20})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-fail-compiler-1
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(foo)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-msg
     "compile error: unknown symbol foo")
   (def expect-2 {"tag" "err"
@@ -220,17 +227,19 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-fail-compiler-2
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(defmacro foo [x] (x)) (foo 1)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2 {"tag" "ret"
                  "op" "env/eval"
                  "lang" u/lang
@@ -241,8 +250,8 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-msg "compile error: error: (macro) 1 called with 0 arguments, possibly expected 1")
   (def expect-3 {"tag" "err"
                  "op" "env/eval"
@@ -254,17 +263,19 @@
                  "janet/line" 1
                  "janet/col" 24
                  "janet/stack" [{:col 19 :line 1 :name "foo" :path u/ns}]})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-fail-runtime
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(+ 1 nil)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-msg
     "error: could not find method :+ for 1 or :r+ for nil")
   (def expect-2 {"tag" "err"
@@ -277,17 +288,19 @@
                  "janet/line" 1
                  "janet/col" 1
                  "janet/stack" [{:col 1 :line 1 :name "thunk" :path u/ns}]})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (is (zero? (ev/count chan))))
-
+  (is (not (parser/has-more p))))
 
 (deftest run-warn-compiler
-  (def [recv send chan] (make-stream))
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
     (e/run "(def x :deprecated 1) (inc x)" :env env :send send :req req))
   (is (nil? actual-1))
-  (def actual-2 (recv))
+  (parser/consume p outb)
   (def expect-2 {"tag" "ret"
                  "op" "env/eval"
                  "lang" u/lang
@@ -298,8 +311,8 @@
                  "janet/path" u/ns
                  "janet/col" 1
                  "janet/line" 1})
+  (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def actual-3 (recv))
   (def expect-3 {"tag" "note"
                  "op" "env/eval"
                  "lang" u/lang
@@ -309,8 +322,8 @@
                  "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1})
+  (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (def actual-4 (recv))
   (def expect-4 {"tag" "ret"
                  "op" "env/eval"
                  "lang" u/lang
@@ -321,9 +334,8 @@
                  "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1})
+  (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
-  (is (zero? (ev/count chan))))
+  (is (not (parser/has-more p))))
 
-
-(use-fixtures :each teardown)
 (run-tests!)

@@ -117,19 +117,25 @@
   Gets the columns in the terminal
   ```
   []
-  (if (nil? cols)
+  (if cols
+    cols
     (do
+      (def win? (= :windows (os/which)))
       (def cmd
-        (if (= :windows (os/which))
+        (if win?
           ["powershell" "-command" "&{(get-host).ui.rawui.WindowSize.Width;}"]
-          ["tput" "cols"]))
+          ["stty" "size"]))
       (with [f (file/temp)]
-        (os/execute cmd :p {:out f})
-        (file/seek f :set 0)
-        (def out (file/read f :all))
-        (def tcols (scan-number (string/trim out)))
-        (min tcols max-width)))
-    cols))
+        (def exit-code (os/execute cmd :p {:out f :err nil}))
+        (if (zero? exit-code)
+          (do
+            (file/seek f :set 0)
+            (def out (string/trim (file/read f :all)))
+            (def tcols (if win?
+                         (scan-number out)
+                         (scan-number (-> (string/split " " out) (get 1)))))
+            (min tcols max-width))
+          max-width)))))
 
 
 (defn- get-rule
@@ -362,7 +368,7 @@
       (string "Usage: "
               command
               ;(map (fn [[name rule]]
-                      (unless (or (nil? rule) (rule :noex?))
+                      (unless (or (nil? rule) (rule :noex?) (rule :hide?))
                         (string " [--" name
                                 (when (or (= :single (rule :kind))
                                           (= :multi (rule :kind)))
@@ -370,15 +376,15 @@
                                 "]")))
                     orules)
               ;(map (fn [[name rule]]
-                      (def proxy (or (rule :proxy) name))
-                      (string " "
-                              (unless (rule :req?) "[")
-                              "<"
-                              proxy
-                              (when (rule :splat?) "...")
-                              ">"
-                              (unless (rule :req?) "]"))
-                      )
+                      (unless (rule :hide?)
+                        (def proxy (or (rule :proxy) name))
+                        (string " "
+                                (unless (rule :req?) "[")
+                                "<"
+                                proxy
+                                (when (rule :splat?) "...")
+                                ">"
+                                (unless (rule :req?) "]"))))
                     prules)
               (unless (empty? subconfigs)
                 " <subcommand> [<args>]"))
@@ -408,9 +414,12 @@
       (xprint help (indent-str (info :about) 0)))
 
     (unless (empty? prules)
-      (usage-parameters info prules))
+      (def shown-rules (filter (fn [[n r]] (not (has-key? r :hide?))) prules))
+      (usage-parameters info shown-rules))
 
-    (usage-options info orules)
+    (unless (empty? orules)
+      (def shown-rules (filter (fn [[n r]] (not (has-key? r :hide?))) orules))
+      (usage-options info shown-rules))
 
     (unless (empty? subconfigs)
       (usage-subcommands info subconfigs))
@@ -453,10 +462,11 @@
   ```
   Consumes an option
   ```
-  [result orules args i &opt is-short?]
+  [result orules args i &opt short?]
   (def opts (result :opts))
+  (def shorts (result :shorts))
   (def arg (in args i))
-  (def name (string/slice arg (if is-short? 1 2)))
+  (def name (string/slice arg (if short? 1 2)))
   (if-let [rule (get-rule name orules)
            long-name (rule :name)
            kind (rule :kind)]
@@ -583,6 +593,8 @@
              (or (= "--help" arg) (= "-h" arg))
              (do
                (put-in result [:opts "help"] true)
+               (if (= "-h" arg)
+                 (put-in result [:opts :h?] true))
                (usage config))
 
              (= "--" arg)
@@ -614,13 +626,15 @@
                  (if subconfig
                    (if (not help?)
                      (with-dyns [:args (array/slice args i)]
-                       (def subresult (parse-args-impl (string command " " subcommand) subconfig))
-                       (when (and (empty? err) (empty? help))
-                         (put subresult :cmd subcommand)
-                         (put result :sub subresult)
-                         (break)))
+                       (def subresult (if (nil? (subconfig :rules))
+                                        @{:cmd subcommand :args (array/slice (dyn :args) 1)}
+                                        (parse-args-impl (string command " " subcommand) subconfig)))
+                       (put subresult :cmd subcommand)
+                       (put result :sub subresult)
+                       (break))
                      (do
                        (put-in result [:opts "help"] true)
+                       (put result :sub @{:cmd subcommand})
                        (set command (string command " " subcommand))
                        (usage subconfig)))
                    (usage-error "unrecognized subcommand '" subcommand "'"))
@@ -668,6 +682,7 @@
   * `:short` - A single letter that is used with `-` rather than `--` and can
     be combined with other short options (e.g. `-lah`).
   * `:help` - The help text for the option, displayed in the usage message.
+  * `:hide?` - Hide the option from the usage message.
   * `:default` - A default value that is used if the option occurs.
   * `:noex?` - Whether to hide the option from the generated usage example.
   * `:value` - A one-argument function that converts the text that is parsed to
@@ -689,6 +704,7 @@
 
   * `:help` - Help text for the parameter, displayed in the usage message.
   * `:default` - Default value that is used if the parameter is not present.
+  * `:hide?` - Hide the parameter from the usage message.
   * `:req?` - Whether the parameter is required to be present.
   * `:value` - One-argument function that converts the textual value that is
     parsed to a value that will be returned in the return struct. This function
@@ -721,7 +737,12 @@
   subcommand's `config` struct contain a `:subs` key with a subcommands tuple
   of its own.
 
-  In  addition to names and configs, the tuple can contain instances of the
+  If the subcommand config struct does not contain a `:rules` key, parsing will
+  stop and all subsequent arguments will be returned under an `:args` key. This
+  can be useful for situations where the user wants to handle parsing in a
+  separate function.
+
+  In addition to names and configs, the tuple can contain instances of the
   string "---". When printing usage information, subcommands that were
   separated by a "---" will be separated by a line break.
 

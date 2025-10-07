@@ -1,0 +1,42 @@
+{:name "Grapple"
+ :version "DEVEL"
+ :description "An mREPL server for Janet"
+ :author "Michael Camilleri"
+ :license "MIT"
+ :url "https://github.com/pyrmont/grapple"
+ :repo "git+https://github.com/pyrmont/grapple"
+
+ :vendored {
+   "deps" [
+     {:name "argy-bargy"
+      :url "https://github.com/pyrmont/argy-bargy"
+      :prefix "argy-bargy"
+      :files ["argy-bargy.janet"
+              "LICENSE"]}
+     {:name "medea"
+      :url "https://github.com/pyrmont/medea"
+      :prefix "medea"
+      :files ["lib/decode.janet"
+              "lib/encode.janet"
+              "init.janet"
+              "LICENSE"]}
+     {:name "testament"
+      :url "https://github.com/pyrmont/testament"
+      :prefix "testament"
+      :files ["lib/testament.janet"
+              "init.janet"
+              "LICENSE"]}]}
+
+ :executable ["bin/grapple"]
+ # :manpage ["man/man1/jeep.1"
+ #           "man/man1/jeep-build.1"
+ #           "man/man1/jeep-clean.1"
+ #           "man/man1/jeep-dep.1"
+ #           "man/man1/jeep-install.1"
+ #           "man/man1/jeep-list.1"
+ #           "man/man1/jeep-prep.1"
+ #           "man/man1/jeep-quickbin.1"
+ #           "man/man1/jeep-test.1"
+ #           "man/man1/jeep-uninstall.1"]
+ :source {:prefix "grapple"
+          :files ["deps" "lib" "init.janet"]}}

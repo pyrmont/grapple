@@ -1,14 +1,5 @@
 (defn- escape [c]
-  (string/from-bytes
-    (case c
-      "\"" 34
-      "\\" 92
-      "/" 47
-      "b" 8
-      "f" 12
-      "n" 10
-      "r" 13
-      "t" 9)))
+  (parse (string `"` c `"`)))
 
 
 (defn- unicode [& args]
@@ -28,7 +19,7 @@
                  :array (/ (* "[" (? (* :element (any (* "," :element)))) :s* "]") ,array)
                  :string (% (* `"` :chars `"`))
                  :chars (any (+ :escape '(to (set `"\`))))
-                 :escape (+ (/ (* `\` '(set `"\/bfnrt`)) ,escape) :unicode)
+                 :escape (+ (/ '(* `\` (set `"\/bfnrt`)) ,escape) :unicode)
                  :unicode (/ (+ (* :hi-surr :lo-surr) (* `\u` '(4 :h))) ,unicode)
                  :hi-surr (* `\u` (number (* (set "Dd") (set "8AaBb") (2 :h)) 16))
                  :lo-surr (* `\u` (number (* (set "Dd") (set "CcDdEeFf") (2 :h)) 16))
