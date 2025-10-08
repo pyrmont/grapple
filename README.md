@@ -17,7 +17,6 @@ Grapple offers:
 
 - form or whole-file evaluation
 - per-file evaluation environments
-- data-rich documentation and error values
 - transitive `import` calls
 - binding redefinition
 
@@ -84,6 +83,7 @@ require("lazy").setup({
 
   {
     dir = "<janet-syspath>/grapple/res/plugins/grapple.nvim",
+    dependencies = { "Olical/nfnl" },
   },
   {
     "Olical/conjure",
