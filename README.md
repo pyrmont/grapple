@@ -27,7 +27,7 @@ REPL protocol, similar to nREPL but with a simpler design.
 
 Install directly:
 
-```console
+```bash
 $ git clone https://github.com/pyrmont/grapple
 $ cd grapple
 $ janet -b .
@@ -37,7 +37,7 @@ $ grapple -h
 
 Or using [Jeep][]:
 
-```console
+```bash
 $ jeep install https://github.com/pyrmont/grapple
 # assuming <janet-syspath>/bin is on your PATH
 $ grapple -h
@@ -59,7 +59,7 @@ Neovim with [Conjure][].
 Grapple's CLI utility can be used like so in the root of the project you're
 developing:
 
-```console
+```bash
 $ grapple --host "127.0.0.1" --port 3737 --logging debug
 ```
 Alternatively, Grapple can be imported as a library into an existing project:
@@ -81,7 +81,8 @@ a `*.janet` file.
 #### Neovim
 
 To use Grapple with Neovim, you can install it using the following package
-managers:
+managers. For `<janet-syspath>`, fill in the path to the location where Grapple
+was installed (e.g. `/usr/local/lib/janet/`).
 
 ##### lazy.nvim
 
