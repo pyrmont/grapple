@@ -22,7 +22,10 @@ end
 local function start_server(opts)
   local host = (opts.host or config["get-in"]({"client", "janet", "mrepl", "connection", "default_host"}))
   local port = (opts.port or config["get-in"]({"client", "janet", "mrepl", "connection", "default_port"}))
-  local pid = vim.fn.jobstart({"grapple", "--host", host, "--port", port}, {detach = true})
+  local here = n.first(vim.api.nvim_get_runtime_file("fnl/grapple/client.fnl", false))
+  local root = vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(here))))))
+  local script = vim.fs.joinpath(root, "lib", "cli.janet")
+  local pid = vim.fn.jobstart({"janet", script, "--host", host, "--port", port}, {detach = true})
   n.assoc(state.get(), "server-pid", pid)
   return log.append("info", {"Server started"})
 end

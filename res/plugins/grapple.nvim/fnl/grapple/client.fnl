@@ -35,7 +35,15 @@
 (fn start-server [opts]
   (let [host (or opts.host (config.get-in [:client :janet :mrepl :connection :default_host]))
         port (or opts.port (config.get-in [:client :janet :mrepl :connection :default_port]))
-        pid  (vim.fn.jobstart ["grapple" "--host" host "--port" port] {:detach true})]
+        here (n.first (vim.api.nvim_get_runtime_file "fnl/grapple/client.fnl" false))
+        root (-> (vim.fs.dirname here) ; ./res/plugins/grapple.nvim/fnl/grapple
+                 (vim.fs.dirname) ; ./res/plugins/grapple.nvim/fnl
+                 (vim.fs.dirname) ; ./res/plugins/grapple.nvim
+                 (vim.fs.dirname) ; ./res/plugins
+                 (vim.fs.dirname) ; ./res
+                 (vim.fs.dirname))
+        script (vim.fs.joinpath root "lib" "cli.janet")
+        pid (vim.fn.jobstart ["janet" script "--host" host "--port" port] {:detach true})]
     (n.assoc (state.get) :server-pid pid)
     (log.append :info ["Server started"])))
 
