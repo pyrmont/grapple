@@ -117,8 +117,9 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def path (dyn :current-file))
   (def actual-1
-    (e/run "(import ./res/test/imported1)" :env env :send send :req req))
+    (e/run "(import ../res/test/imported1)" :env env :send send :req req :path path))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -140,7 +141,7 @@
      "sess" "1"
      "done" false
      "val" expect-3-val
-     "janet/path" u/ns
+     "janet/path" path
      "janet/line" 1
      "janet/col" 1})
   (def actual-3 (parser/produce p))
@@ -153,8 +154,9 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def path (dyn :current-file))
   (def actual-1
-    (e/run "(import ./res/test/imported2)" :env env :send send :req req))
+    (e/run "(import ../res/test/imported2)" :env env :send send :req req :path path))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -176,7 +178,7 @@
      "sess" "1"
      "done" false
      "val" expect-3-val
-     "janet/path" u/ns
+     "janet/path" path
      "janet/line" 1
      "janet/col" 1})
   (def actual-3 (parser/produce p))

@@ -165,6 +165,9 @@
   (def p (or parser (parser/new)))
   (def guard :ydt)
 
+  # set current file
+  (put eval1-env :current-file where)
+
   # normally located outside run-context body
   (def lint-levels
     {:none 0
