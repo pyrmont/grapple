@@ -39,4 +39,4 @@
  #           "man/man1/jeep-test.1"
  #           "man/man1/jeep-uninstall.1"]
  :source {:prefix "grapple"
-          :files ["deps" "lib" "init.janet"]}}
+          :files ["deps" "lib" "res" "init.janet"]}}

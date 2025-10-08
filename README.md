@@ -68,8 +68,8 @@ $ grapple --host "127.0.0.1" --port 3737 --logging "debug"
 
 #### Neovim (Conjure)
 
-Grapple comes with a client for [Conjure][], a Neovim plugin. If Conjure is installed,
-add this to your `init.lua`:
+Grapple comes with a client for [Conjure][], a Neovim plugin. Add this to your
+`init.lua`:
 
 **lazy.nvim**
 
@@ -78,9 +78,18 @@ require("lazy").setup({
   <...>
 
   {
-    "pyrmont/grapple",
+    dir = "<janet-syspath>/grapple",
+    dependencies = { "Olical/nfnl", ft = "fennel" },
     config = function(plugin)
       vim.opt.rtp:append(plugin.dir .. "/res/plugins/grapple.nvim")
+    end,
+  },
+  {
+    "Olical/conjure",
+    init = function()
+      vim.g["conjure#log#strip_ansi_escape_sequences_line_limit"] = 1000
+      vim.g["conjure#filetype#janet"] = "grapple.client"
+      vim.g["conjure#log#wrap"] = true
     end,
   },
 
