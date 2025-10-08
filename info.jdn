@@ -1,4 +1,4 @@
-{:name "Grapple"
+{:name "grapple"
  :version "DEVEL"
  :description "An mREPL server for Janet"
  :author "Michael Camilleri"
