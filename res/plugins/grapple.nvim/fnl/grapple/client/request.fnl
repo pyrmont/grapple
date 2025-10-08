@@ -1,7 +1,6 @@
 (local {: autoload} (require :nfnl.module))
 (local log (autoload :grapple.client.log))
 (local n (autoload :nfnl.core))
-(local state (autoload :grapple.client.state))
 
 (fn sess-new [conn opts]
   (conn.send {:op "sess.new"}
@@ -24,10 +23,10 @@
              opts.action))
 
 (fn serv-rest [conn opts]
-  (conn.send {:op "serv.rest"}
-             opts.action))
+  (log.append :error ["serv.rest is not supported"]))
 
 (fn env-eval [conn opts]
+  (log.append :input [opts.code])
   (conn.send {:op "env.eval"
               :ns opts.file-path
               :code opts.code
@@ -41,7 +40,7 @@
              opts.action))
 
 (fn env-stop [conn opts]
-  (log.append ["# env.stop is not supported"]))
+  (log.append :error ["env.stop is not supported"]))
 
 (fn env-doc [conn opts]
   (conn.send {:op "env.doc"

@@ -1,9 +1,8 @@
--- [nfnl] Compiled from fnl/grapple/client/request.fnl by https://github.com/Olical/nfnl, do not edit.
+-- [nfnl] fnl/grapple/client/request.fnl
 local _local_1_ = require("nfnl.module")
 local autoload = _local_1_["autoload"]
 local log = autoload("grapple.client.log")
 local n = autoload("nfnl.core")
-local state = autoload("grapple.client.state")
 local function sess_new(conn, opts)
   return conn.send({op = "sess.new"}, opts.action)
 end
@@ -27,16 +26,17 @@ local function serv_stop(conn, opts)
   return conn.send({op = "serv.stop"}, opts.action)
 end
 local function serv_rest(conn, opts)
-  return conn.send({op = "serv.rest"}, opts.action)
+  return log.append("error", {"serv.rest is not supported"})
 end
 local function env_eval(conn, opts)
+  log.append("input", {opts.code})
   return conn.send({op = "env.eval", ns = opts["file-path"], code = opts.code, col = n["get-in"](opts.range, {"start", 2}, 1), line = n["get-in"](opts.range, {"start", 1}, 1)}, opts.action)
 end
 local function env_load(conn, opts)
   return conn.send({op = "env.load", path = opts["file-path"]}, opts.action)
 end
 local function env_stop(conn, opts)
-  return log.append({"# env.stop is not supported"})
+  return log.append("error", {"env.stop is not supported"})
 end
 local function env_doc(conn, opts)
   return conn.send({op = "env.doc", ns = opts["file-path"], sym = opts.code}, opts.action)

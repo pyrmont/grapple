@@ -14,9 +14,10 @@
   (= "err" msg.tag))
 
 (fn display-error [desc msg]
-  (log.append [(.. "# ! " desc)])
+  (log.append :error [desc])
   (when msg
-    (log.append [(.. "# ! in " msg.janet/path
+    (log.append :error
+                [(.. " in " msg.janet/path
                      " on line " msg.janet/line
                      " at col " msg.janet/col)])))
 
@@ -24,31 +25,32 @@
   (n.assoc (state.get :conn) :session resp.sess)
   (let [[impl-name impl-ver] resp.janet/impl
         [serv-name serv-ver] resp.janet/serv]
-    (log.append [(.. "# Connected to "
-                     (upcase serv-name 1)
-                     " v"
-                     serv-ver
-                     " running "
-                     (upcase impl-name 1)
-                     " v"
-                     impl-ver
-                     " as session "
-                     resp.sess)])))
+    (log.append :info
+                [(.. "Connected to " (upcase serv-name 1)
+                     " v" serv-ver
+                     " running " (upcase impl-name 1)
+                     " v" impl-ver
+                     " as session " resp.sess)])))
 
 (fn handle-env-eval [resp]
   (if
+    (= nil resp.val)
+    nil ; do nothing if no value to print
+
     (and (= "out" resp.tag) (= "out" resp.ch))
-    (log.append [(.. "# (out) " resp.val)])
+    (log.append :stdout [resp.val])
 
     (and (= "out" resp.tag) (= "err" resp.ch))
-    (log.append [(.. "# (err) " resp.val)])
+    (log.append :stderr [resp.val])
 
-    (log.append [resp.val])))
+    (and (= "ret" resp.tag) (not= nil resp.val))
+    (log.append :result [resp.val])))
 
 (fn handle-env-doc [resp action]
   (if
     (= "doc" action)
-    (let [buf (vim.api.nvim_create_buf false true)
+    (let [src-buf (vim.api.nvim_get_current_buf)
+          buf (vim.api.nvim_create_buf false true)
           sm-info (.. resp.janet/type
                       "\n"
                       (if (not resp.janet/sm)
@@ -67,16 +69,27 @@
                     :anchor "NW"
                     :style "minimal"
                     :border "rounded"}
-          win (vim.api.nvim_open_win buf false win-opts)]
-     (vim.api.nvim_buf_set_option buf "wrap" true)
-     (vim.api.nvim_buf_set_option buf "linebreak" true)
-     (vim.api.nvim_buf_set_option buf "filetype" "markdown")
-     (vim.api.nvim_create_autocmd :CursorMoved
-                                  {:once true
-                                   :callback (fn []
-                                               (vim.api.nvim_win_close win true)
-                                               (vim.api.nvim_buf_delete buf {:force true})
-                                               nil)}))
+          win (vim.api.nvim_open_win buf true win-opts)]
+      (vim.keymap.set :n "j" "gj" {:buffer buf :noremap true :silent true})
+      (vim.keymap.set :n "k" "gk" {:buffer buf :noremap true :silent true})
+      (vim.keymap.set :n "<Down>" "gj" {:buffer buf :noremap true :silent true})
+      (vim.keymap.set :n "<Up>" "gk" {:buffer buf :noremap true :silent true})
+      (vim.keymap.set :n "q" ":q<CR>" {:buffer buf :noremap true :silent true})
+      (vim.keymap.set :n "<Esc>" ":q<CR>" {:buffer buf :noremap true :silent true})
+      (vim.api.nvim_buf_set_option buf "wrap" true)
+      (vim.api.nvim_buf_set_option buf "linebreak" true)
+      (vim.api.nvim_buf_set_option buf "filetype" "markdown")
+      (vim.api.nvim_win_set_option win "scrolloff" 0)
+      (vim.api.nvim_win_set_option win "sidescrolloff" 0)
+      (vim.api.nvim_win_set_option win "breakindent" true)
+      (vim.api.nvim_create_autocmd :CursorMoved
+                                   {:buffer src-buf
+                                    :once true
+                                    :callback (fn []
+                                                (when (vim.api.nvim_win_is_valid win)
+                                                  (vim.api.nvim_win_close win true))
+                                                (vim.api.nvim_buf_delete buf {:force true})
+                                                nil)}))
     (= "def" action)
     (let [[path line col] resp.janet/sm
           stat (vim.loop.fs_stat path)]
@@ -124,6 +137,6 @@
     (handle-env-cmpl msg)
 
     (do
-      (log.append ["# Unrecognised message"])))))
+      (log.append :error ["Unrecognised message"])))))
 
 {: handle-message}

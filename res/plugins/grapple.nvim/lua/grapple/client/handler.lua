@@ -1,4 +1,4 @@
--- [nfnl] Compiled from fnl/grapple/client/handler.fnl by https://github.com/Olical/nfnl, do not edit.
+-- [nfnl] fnl/grapple/client/handler.fnl
 local _local_1_ = require("nfnl.module")
 local autoload = _local_1_["autoload"]
 local editor = autoload("conjure.editor")
@@ -15,9 +15,9 @@ local function error_msg_3f(msg)
   return ("err" == msg.tag)
 end
 local function display_error(desc, msg)
-  log.append({("# ! " .. desc)})
+  log.append("error", {desc})
   if msg then
-    return log.append({("# ! in " .. msg["janet/path"] .. " on line " .. msg["janet/line"] .. " at col " .. msg["janet/col"])})
+    return log.append("error", {(" in " .. msg["janet/path"] .. " on line " .. msg["janet/line"] .. " at col " .. msg["janet/col"])})
   else
     return nil
   end
@@ -28,19 +28,24 @@ local function handle_sess_new(resp)
   local impl_ver = resp["janet/impl"][2]
   local serv_name = resp["janet/serv"][1]
   local serv_ver = resp["janet/serv"][2]
-  return log.append({("# Connected to " .. upcase(serv_name, 1) .. " v" .. serv_ver .. " running " .. upcase(impl_name, 1) .. " v" .. impl_ver .. " as session " .. resp.sess)})
+  return log.append("info", {("Connected to " .. upcase(serv_name, 1) .. " v" .. serv_ver .. " running " .. upcase(impl_name, 1) .. " v" .. impl_ver .. " as session " .. resp.sess)})
 end
 local function handle_env_eval(resp)
-  if (("out" == resp.tag) and ("out" == resp.ch)) then
-    return log.append({("# (out) " .. resp.val)})
+  if (nil == resp.val) then
+    return nil
+  elseif (("out" == resp.tag) and ("out" == resp.ch)) then
+    return log.append("stdout", {resp.val})
   elseif (("out" == resp.tag) and ("err" == resp.ch)) then
-    return log.append({("# (err) " .. resp.val)})
+    return log.append("stderr", {resp.val})
+  elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
+    return log.append("result", {resp.val})
   else
-    return log.append({resp.val})
+    return nil
   end
 end
 local function handle_env_doc(resp, action)
   if ("doc" == action) then
+    local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
     local _4_
@@ -58,16 +63,28 @@ local function handle_env_doc(resp, action)
     local width = 50
     local height = 10
     local win_opts = {relative = "cursor", width = width, height = height, col = 0, row = 1, anchor = "NW", style = "minimal", border = "rounded"}
-    local win = vim.api.nvim_open_win(buf, false, win_opts)
+    local win = vim.api.nvim_open_win(buf, true, win_opts)
+    vim.keymap.set("n", "j", "gj", {buffer = buf, noremap = true, silent = true})
+    vim.keymap.set("n", "k", "gk", {buffer = buf, noremap = true, silent = true})
+    vim.keymap.set("n", "<Down>", "gj", {buffer = buf, noremap = true, silent = true})
+    vim.keymap.set("n", "<Up>", "gk", {buffer = buf, noremap = true, silent = true})
+    vim.keymap.set("n", "q", ":q<CR>", {buffer = buf, noremap = true, silent = true})
+    vim.keymap.set("n", "<Esc>", ":q<CR>", {buffer = buf, noremap = true, silent = true})
     vim.api.nvim_buf_set_option(buf, "wrap", true)
     vim.api.nvim_buf_set_option(buf, "linebreak", true)
     vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
+    vim.api.nvim_win_set_option(win, "scrolloff", 0)
+    vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
+    vim.api.nvim_win_set_option(win, "breakindent", true)
     local function _7_()
-      vim.api.nvim_win_close(win, true)
+      if vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_close(win, true)
+      else
+      end
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {once = true, callback = _7_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _7_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -109,7 +126,7 @@ local function handle_message(msg, action)
     elseif ("env.cmpl" == msg.op) then
       return __fnl_global__handle_2denv_2dcmpl(msg)
     else
-      return log.append({"# Unrecognised message"})
+      return log.append("error", {"Unrecognised message"})
     end
   else
     return nil
