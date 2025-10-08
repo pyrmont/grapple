@@ -32,6 +32,7 @@ Install directly:
 $ git clone https://github.com/pyrmont/grapple
 $ cd grapple
 $ janet -b .
+# assuming <janet-syspath>/bin is on your PATH
 $ grapple -h
 ```
 
@@ -39,6 +40,7 @@ Or using [Jeep][]:
 
 ```console
 $ jeep install https://github.com/pyrmont/grapple
+# assuming <janet-syspath>/bin is on your PATH
 $ grapple -h
 ```
 
@@ -57,12 +59,15 @@ Grapple can be imported as a library into an existing project:
 (grapple/server/start "127.0.0.1" 3737)
 ```
 
-Alternatively, Grapple's CLI utility can be used like this in your project
+Alternatively, Grapple's CLI utility can be used like this in your bundle
 root:
 
 ```shell
 $ grapple --host "127.0.0.1" --port 3737 --logging "debug"
 ```
+
+Or if you just want to get going quickly, launch Neovim from your bundle root
+and it will start an instance of `grapple` automatically.
 
 ### Client
 
@@ -78,18 +83,12 @@ require("lazy").setup({
   <...>
 
   {
-    dir = "<janet-syspath>/grapple",
-    dependencies = { "Olical/nfnl", ft = "fennel" },
-    config = function(plugin)
-      vim.opt.rtp:append(plugin.dir .. "/res/plugins/grapple.nvim")
-    end,
+    dir = "<janet-syspath>/grapple/res/plugins/grapple.nvim",
   },
   {
     "Olical/conjure",
     init = function()
-      vim.g["conjure#log#strip_ansi_escape_sequences_line_limit"] = 1000
       vim.g["conjure#filetype#janet"] = "grapple.client"
-      vim.g["conjure#log#wrap"] = true
     end,
   },
 
