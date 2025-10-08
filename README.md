@@ -8,7 +8,7 @@
 Grapple is an mREPL server for Janet.
 
 > [!WARNING]
-> Jeep is in an alpha stage of development. There are likely to be bugs and
+> Grapple is in an alpha stage of development. There are likely to be bugs and
 > gaps in its implementation.
 
 ## Features
@@ -43,13 +43,26 @@ $ jeep install https://github.com/pyrmont/grapple
 $ grapple -h
 ```
 
-[Jeep]: https://github.com/pyrmont/grapple
+[Jeep]: https://github.com/pyrmont/jeep
 
 ## Usage
 
+Grapple consists of a server and a client that communicate using the mREPL
+protocol. The server is a Janet CLI utility, `grapple`. The client is your
+editor (using a plugin). At the time of writing, the only supported editor is
+Neovim with [Conjure][].
+
+[Conjure]: https://conjure.oli.me.uk
+
 ### Server
 
-Grapple can be imported as a library into an existing project:
+Grapple's CLI utility can be used like so in the root of the project you're
+developing:
+
+```console
+$ grapple --host "127.0.0.1" --port 3737 --logging debug
+```
+Alternatively, Grapple can be imported as a library into an existing project:
 
 ```janet
 (import grapple)
@@ -58,24 +71,19 @@ Grapple can be imported as a library into an existing project:
 (grapple/server/start "127.0.0.1" 3737)
 ```
 
-Alternatively, Grapple's CLI utility can be used like this in your bundle
-root:
-
-```shell
-$ grapple --host "127.0.0.1" --port 3737 --logging "debug"
-```
-
-Or if you just want to get going quickly, launch Neovim from your bundle root
-and it will start an instance of `grapple` automatically.
+Or if you just want to get going quickly, launch Neovim from your project root
+and the client will either connect to an existing instance of `grapple` or, if
+one is not availabe, Grapple will start an instance automatically when you open
+a `*.janet` file.
 
 ### Client
 
-#### Neovim (Conjure)
+#### Neovim
 
-Grapple comes with a client for [Conjure][], a Neovim plugin. Add this to your
-`init.lua`:
+To use Grapple with Neovim, you can install it using the following package
+managers:
 
-**lazy.nvim**
+##### lazy.nvim
 
 ```lua
 require("lazy").setup({
@@ -96,7 +104,23 @@ require("lazy").setup({
 })
 ```
 
-[Conjure]: https://conjure.oli.me.uk
+##### vim-plug
+
+```vimscript
+call plug#begin('~/.vim/plugged')
+
+" Dependencies
+Plug 'Olical/nfnl'
+Plug 'Olical/conjure'
+
+" Grapple (local path)
+Plug '<janet-syspath>/grapple/res/plugins/grapple.nvim'
+
+call plug#end()
+
+" Configure Conjure for Janet + Grapple
+let g:conjure#filetype#janet = 'grapple.client'
+```
 
 ## Bugs
 
