@@ -84,7 +84,9 @@
         host (or opts.host (config.get-in [:client :janet :mrepl :connection :default_host]))
         port (or opts.port (config.get-in [:client :janet :mrepl :connection :default_port]))
         lang (config.get-in [:client :janet :mrepl :connection :lang])
-        auto-start? (not opts.no-auto-start?)]
+        auto-start? (if (n.nil? opts.no-auto-start?)
+                      (config.get-in [:client :janet :mrepl :connection :auto-repl :enabled])
+                      (not opts.no-auto-start?))]
     ; TODO: don't disconnect
     (when (state.get :conn)
       (disconnect))

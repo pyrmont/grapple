@@ -75,37 +75,42 @@ local function connect(opts)
   local host = (opts0.host or config["get-in"]({"client", "janet", "mrepl", "connection", "default_host"}))
   local port = (opts0.port or config["get-in"]({"client", "janet", "mrepl", "connection", "default_port"}))
   local lang = config["get-in"]({"client", "janet", "mrepl", "connection", "lang"})
-  local auto_start_3f = not opts0["no-auto-start?"]
+  local auto_start_3f
+  if n["nil?"](opts0["no-auto-start?"]) then
+    auto_start_3f = config["get-in"]({"client", "janet", "mrepl", "connection", "auto-repl", "enabled"})
+  else
+    auto_start_3f = not opts0["no-auto-start?"]
+  end
   if state.get("conn") then
     disconnect()
   else
   end
   local conn
-  local function _9_(err)
+  local function _10_(err)
     if (auto_start_3f and not opts0["retry?"]) then
       start_server(opts0)
-      local function _10_()
+      local function _11_()
         return connect(n.assoc(opts0, "retry?", true))
       end
-      return vim.defer_fn(_10_, 1000)
+      return vim.defer_fn(_11_, 1000)
     else
       display_conn_status(err)
       return disconnect()
     end
   end
-  local function _12_()
+  local function _13_()
     n.assoc(state.get(), "conn", conn)
     display_conn_status("connected")
     return request["sess-new"](conn, opts0)
   end
-  local function _13_(err)
+  local function _14_(err)
     if err then
       return display_conn_status(err)
     else
       return disconnect()
     end
   end
-  conn = remote.connect({host = host, port = port, lang = lang, ["on-message"] = handler["handle-message"], ["on-failure"] = _9_, ["on-success"] = _12_, ["on-error"] = _13_})
+  conn = remote.connect({host = host, port = port, lang = lang, ["on-message"] = handler["handle-message"], ["on-failure"] = _10_, ["on-success"] = _13_, ["on-error"] = _14_})
   return nil
 end
 local function try_ensure_conn()
@@ -133,10 +138,10 @@ local function def_str(opts)
 end
 local function on_filetype()
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _16_()
+  local function _17_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _16_, {desc = "Connect to a REPL"})
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _17_, {desc = "Connect to a REPL"})
   return mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
 end
 local function on_load()
