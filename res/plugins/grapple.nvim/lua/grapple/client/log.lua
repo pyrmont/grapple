@@ -1,9 +1,9 @@
 -- [nfnl] fnl/grapple/client/log.fnl
-local _local_1_ = require("nfnl.module")
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
 local client = autoload("conjure.client")
 local log = autoload("conjure.log")
-local n = autoload("nfnl.core")
+local n = autoload("conjure.nfnl.core")
 local state = autoload("grapple.client.state")
 local str = autoload("conjure.nfnl.string")
 local info_header = "======= info ======="

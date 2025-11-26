@@ -1,12 +1,12 @@
--- [nfnl] Compiled from fnl/grapple/transport.fnl by https://github.com/Olical/nfnl, do not edit.
-local _local_1_ = require("nfnl.module")
+-- [nfnl] fnl/grapple/transport.fnl
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
-local a = autoload("conjure.aniseed.core")
+local n = autoload("conjure.nfnl.core")
 local bit = autoload("bit")
 local function encode(msg)
   local blob = vim.json.encode(msg)
-  local n = a.count(blob)
-  return (string.char(bit.band(n, 255), bit.band(bit.rshift(n, 8), 255), bit.band(bit.rshift(n, 16), 255), bit.band(bit.rshift(n, 24), 255)) .. blob)
+  local len = n.count(blob)
+  return (string.char(bit.band(len, 255), bit.band(bit.rshift(len, 8), 255), bit.band(bit.rshift(len, 16), 255), bit.band(bit.rshift(len, 24), 255)) .. blob)
 end
 local function split(chunk)
   local b0, b1, b2, b3 = string.byte(chunk, 1, 4)
@@ -23,12 +23,12 @@ local function make_decode()
   local function decode(chunk, acc)
     local acc0 = (acc or {})
     if awaiting then
-      local before = a.count(buffer)
-      local seen = a.count(chunk)
+      local before = n.count(buffer)
+      local seen = n.count(chunk)
       buffer = (buffer .. chunk)
       if (seen > awaiting) then
         local consumed = string.sub(buffer, 1, (before + awaiting))
-        local next_chunk = string.sub(chunk, a.inc(awaiting))
+        local next_chunk = string.sub(chunk, n.inc(awaiting))
         table.insert(acc0, vim.json.decode(consumed))
         reset()
         return decode(next_chunk, acc0)
@@ -41,8 +41,8 @@ local function make_decode()
         return acc0
       end
     else
-      local n, rem = split(chunk)
-      awaiting = n
+      local n0, rem = split(chunk)
+      awaiting = n0
       return decode(rem, acc0)
     end
   end

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -e  # Exit on error
+
+echo "Setting up test environment..."
+
+CACHE_DIR=.cache/nvim-plugins
+PACK_DIR=tmp/nvim/pack/main/start
+
+mkdir -p "$CACHE_DIR"
+rm -rf "$PACK_DIR"
+mkdir -p "$PACK_DIR"
+
+# Clone to cache if not exists, then copy to pack dir
+if [ ! -d "$CACHE_DIR/plenary.nvim" ]; then
+  echo "Cloning plenary.nvim to cache..."
+  git clone --depth 1 https://github.com/nvim-lua/plenary.nvim.git "$CACHE_DIR/plenary.nvim"
+fi
+echo "Copying plenary.nvim from cache..."
+cp -r "$CACHE_DIR/plenary.nvim" "$PACK_DIR/plenary.nvim"
+
+if [ ! -d "$CACHE_DIR/conjure" ]; then
+  echo "Cloning conjure to cache..."
+  git clone --depth 1 https://github.com/Olical/conjure.git "$CACHE_DIR/conjure"
+fi
+echo "Copying conjure from cache..."
+cp -r "$CACHE_DIR/conjure" "$PACK_DIR/conjure"
+
+rm -f "$PACK_DIR/grapple.nvim"
+ln -s "../../../../../res/plugins/grapple.nvim/" "$PACK_DIR/grapple.nvim"
+
+# Create test environment directories
+XDG_CONFIG_HOME=$(pwd)/tmp
+XDG_DATA_HOME=$(pwd)/tmp/data
+XDG_STATE_HOME=$(pwd)/tmp/state
+export XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
+
+echo ""
+echo "Running system tests..."
+echo "NOTE: System tests may take several seconds as they start real servers."
+echo ""
+
+# Run tests with Neovim headless
+nvim --headless \
+     --cmd "set rtp+=./res/plugins/grapple.nvim" \
+     -c 'PlenaryBustedDirectory res/plugins/grapple.nvim/lua/grapple-system'
+
+# Capture the exit code
+TEST_EXIT_CODE=$?
+
+echo ""
+echo "Cleaning up test environment..."
+
+# Remove test directories
+rm -rf tmp
+
+echo "Done!"
+
+exit $TEST_EXIT_CODE

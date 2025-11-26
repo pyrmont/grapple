@@ -1,5 +1,5 @@
-(local {: autoload} (require :nfnl.module))
-(local a (autoload :conjure.aniseed.core))
+(local {: autoload} (require :conjure.nfnl.module))
+(local n (autoload :conjure.nfnl.core))
 (local client (autoload :conjure.client))
 (local log (autoload :conjure.log))
 (local net (autoload :conjure.net))
@@ -24,10 +24,10 @@
 
   (fn send [msg action]
     (let [id (uuid.v4)]
-      (a.assoc msg :id id :lang conn.lang)
+      (n.assoc msg :id id :lang conn.lang)
       (when conn.session
-        (a.assoc msg :sess conn.session))
-      (a.assoc-in conn [:msgs id] {:msg msg :action action})
+        (n.assoc msg :sess conn.session))
+      (n.assoc-in conn [:msgs id] {:msg msg :action action})
       (log.dbg "send" msg)
       (conn.sock:write (trn.encode msg))))
 
@@ -35,19 +35,19 @@
     (if (or err (not chunk))
       (opts.on-error err)
       (->> (conn.decode chunk)
-           (a.run!
+           (n.run!
              (fn [msg]
                (log.dbg "receive" msg)
                (let [id msg.req
-                     action (a.get-in conn [:msgs id :action])]
+                     action (n.get-in conn [:msgs id :action])]
                  (opts.on-message msg action)))))))
 
   (fn process-queue []
     (set conn.awaiting-process? false)
-    (when (not (a.empty? conn.queue))
+    (when (not (n.empty? conn.queue))
       (let [msgs conn.queue]
         (set conn.queue [])
-        (a.run!
+        (n.run!
           (fn [args]
             (process-message (unpack args)))
           msgs))))
@@ -69,7 +69,7 @@
             (conn.sock:read_start (client.wrap enqueue-message)))))))
 
   (set conn
-       (a.merge
+       (n.merge
          conn
          {:send send}
          (net.connect
@@ -83,10 +83,10 @@
 ; (def c (connect
 ;          {:host "127.0.0.1"
 ;           :port "9365"
-;           :on-failure (fn [err] (a.println "oh no" err))
-;           :on-success (fn [] (a.println "Yay!"))
-;           :on-error (fn [err] (a.println "uh oh :(" err))}))
-; (send c "{:hello :world}" a.println)
+;           :on-failure (fn [err] (n.println "oh no" err))
+;           :on-success (fn [] (n.println "Yay!"))
+;           :on-error (fn [err] (n.println "uh oh :(" err))}))
+; (send c "{:hello :world}" n.println)
 ; (c.destroy)
 
 {: connect}

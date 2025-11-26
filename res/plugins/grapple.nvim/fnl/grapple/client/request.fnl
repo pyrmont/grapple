@@ -1,6 +1,6 @@
-(local {: autoload} (require :nfnl.module))
+(local {: autoload} (require :conjure.nfnl.module))
 (local log (autoload :grapple.client.log))
-(local n (autoload :nfnl.core))
+(local n (autoload :conjure.nfnl.core))
 
 (fn sess-new [conn opts]
   (conn.send {:op "sess.new"}

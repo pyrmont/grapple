@@ -1,5 +1,5 @@
--- [nfnl] Compiled from fnl/grapple/client/state.fnl by https://github.com/Olical/nfnl, do not edit.
-local _local_1_ = require("nfnl.module")
+-- [nfnl] fnl/grapple/client/state.fnl
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
 local client = autoload("conjure.client")
 local get

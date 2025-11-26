@@ -1,15 +1,15 @@
-(local {: autoload} (require :nfnl.module))
-(local a (autoload :conjure.aniseed.core))
+(local {: autoload} (require :conjure.nfnl.module))
+(local n (autoload :conjure.nfnl.core))
 (local bit (autoload :bit))
 
 (fn encode [msg]
   (let [blob (vim.json.encode msg)
-        n (a.count blob)]
+        len (n.count blob)]
     (..  (string.char
-           (bit.band n 0xFF)
-           (bit.band (bit.rshift n 8) 0xFF)
-           (bit.band (bit.rshift n 16) 0xFF)
-           (bit.band (bit.rshift n 24) 0xFF))
+           (bit.band len 0xFF)
+           (bit.band (bit.rshift len 8) 0xFF)
+           (bit.band (bit.rshift len 16) 0xFF)
+           (bit.band (bit.rshift len 24) 0xFF))
         blob)))
 
 (fn split [chunk]
@@ -35,8 +35,8 @@
 
     (if awaiting
       (do
-        (local before (a.count buffer))
-        (local seen (a.count chunk))
+        (local before (n.count buffer))
+        (local seen (n.count chunk))
         (set buffer (.. buffer chunk))
 
         (if
@@ -44,7 +44,7 @@
           ;; Consume part of the buffer reset state and recur.
           (> seen awaiting)
           (let [consumed (string.sub buffer 1 (+ before awaiting))
-                next-chunk (string.sub chunk (a.inc awaiting))]
+                next-chunk (string.sub chunk (n.inc awaiting))]
             (table.insert acc (vim.json.decode consumed))
             (reset)
             (decode next-chunk acc))

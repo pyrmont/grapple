@@ -1,9 +1,9 @@
-(local {: autoload} (require :nfnl.module))
+(local {: autoload} (require :conjure.nfnl.module))
 (local editor (autoload :conjure.editor))
 (local log (autoload :grapple.client.log))
-(local n (autoload :nfnl.core))
+(local n (autoload :conjure.nfnl.core))
 (local state (autoload :grapple.client.state))
-(local str (autoload :nfnl.string))
+(local str (autoload :conjure.nfnl.string))
 
 (fn upcase [s n]
   (let [start (string.sub s 1 n)

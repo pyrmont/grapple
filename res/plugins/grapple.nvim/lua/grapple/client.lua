@@ -1,11 +1,11 @@
 -- [nfnl] fnl/grapple/client.fnl
-local _local_1_ = require("nfnl.module")
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
 local config = autoload("conjure.config")
 local handler = autoload("grapple.client.handler")
 local log = autoload("grapple.client.log")
 local mapping = autoload("conjure.mapping")
-local n = autoload("nfnl.core")
+local n = autoload("conjure.nfnl.core")
 local remote = autoload("grapple.remote")
 local request = autoload("grapple.client.request")
 local state = autoload("grapple.client.state")

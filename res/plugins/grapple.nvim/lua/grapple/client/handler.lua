@@ -1,11 +1,11 @@
 -- [nfnl] fnl/grapple/client/handler.fnl
-local _local_1_ = require("nfnl.module")
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
 local editor = autoload("conjure.editor")
 local log = autoload("grapple.client.log")
-local n = autoload("nfnl.core")
+local n = autoload("conjure.nfnl.core")
 local state = autoload("grapple.client.state")
-local str = autoload("nfnl.string")
+local str = autoload("conjure.nfnl.string")
 local function upcase(s, n0)
   local start = string.sub(s, 1, n0)
   local rest = string.sub(s, (n0 + 1))

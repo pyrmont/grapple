@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -e  # Exit on error
+
+echo "Compiling Fennel test files to Lua..."
+
+# Create the directories
+mkdir -p res/plugins/grapple.nvim/lua/grapple-unit
+mkdir -p res/plugins/grapple.nvim/lua/grapple-system
+
+# Compile by opening each Fennel file and writing it (triggering nfnl's on-save hook)
+cd res/plugins/grapple.nvim
+
+# Use find to locate all .fnl files in grapple-unit
+find fnl/grapple-unit -name "*.fnl" -type f | while read -r fnl_file; do
+  echo "  Compiling $fnl_file..."
+  nvim --headless -n \
+    --cmd "set rtp+=." \
+    -c "silent! edit $fnl_file" \
+    -c "silent! write" \
+    -c "qa"
+done
+
+# Use find to locate all .fnl files in grapple-system
+find fnl/grapple-system -name "*.fnl" -type f | while read -r fnl_file; do
+  echo "  Compiling $fnl_file..."
+  nvim --headless -n \
+    --cmd "set rtp+=." \
+    -c "silent! edit $fnl_file" \
+    -c "silent! write" \
+    -c "qa"
+done
+
+cd ../../..
+
+echo "Compilation complete!"

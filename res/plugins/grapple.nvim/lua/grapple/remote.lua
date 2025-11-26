@@ -1,7 +1,7 @@
 -- [nfnl] fnl/grapple/remote.fnl
-local _local_1_ = require("nfnl.module")
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
-local a = autoload("conjure.aniseed.core")
+local n = autoload("conjure.nfnl.core")
 local client = autoload("conjure.client")
 local log = autoload("conjure.log")
 local net = autoload("conjure.net")
@@ -11,12 +11,12 @@ local function connect(opts)
   local conn = {decode = trn["make-decode"](), lang = opts.lang, msgs = {}, queue = {}, session = nil}
   local function send(msg, action)
     local id = uuid.v4()
-    a.assoc(msg, "id", id, "lang", conn.lang)
+    n.assoc(msg, "id", id, "lang", conn.lang)
     if conn.session then
-      a.assoc(msg, "sess", conn.session)
+      n.assoc(msg, "sess", conn.session)
     else
     end
-    a["assoc-in"](conn, {"msgs", id}, {msg = msg, action = action})
+    n["assoc-in"](conn, {"msgs", id}, {msg = msg, action = action})
     log.dbg("send", msg)
     return conn.sock:write(trn.encode(msg))
   end
@@ -27,21 +27,21 @@ local function connect(opts)
       local function _3_(msg)
         log.dbg("receive", msg)
         local id = msg.req
-        local action = a["get-in"](conn, {"msgs", id, "action"})
+        local action = n["get-in"](conn, {"msgs", id, "action"})
         return opts["on-message"](msg, action)
       end
-      return a["run!"](_3_, conn.decode(chunk))
+      return n["run!"](_3_, conn.decode(chunk))
     end
   end
   local function process_queue()
     conn["awaiting-process?"] = false
-    if not a["empty?"](conn.queue) then
+    if not n["empty?"](conn.queue) then
       local msgs = conn.queue
       conn.queue = {}
       local function _5_(args)
         return process_message(unpack(args))
       end
-      return a["run!"](_5_, msgs)
+      return n["run!"](_5_, msgs)
     else
       return nil
     end
@@ -67,7 +67,7 @@ local function connect(opts)
     end
     return client["schedule-wrap"](_8_)
   end
-  conn = a.merge(conn, {send = send}, net.connect({host = opts.host, port = opts.port, cb = handle_connect()}))
+  conn = n.merge(conn, {send = send}, net.connect({host = opts.host, port = opts.port, cb = handle_connect()}))
   return conn
 end
 return {connect = connect}

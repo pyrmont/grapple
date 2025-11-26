@@ -1,8 +1,8 @@
 -- [nfnl] fnl/grapple/client/request.fnl
-local _local_1_ = require("nfnl.module")
+local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_["autoload"]
 local log = autoload("grapple.client.log")
-local n = autoload("nfnl.core")
+local n = autoload("conjure.nfnl.core")
 local function sess_new(conn, opts)
   return conn.send({op = "sess.new"}, opts.action)
 end

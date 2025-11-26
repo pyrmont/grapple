@@ -1,7 +1,7 @@
-(local {: autoload} (require :nfnl.module))
+(local {: autoload} (require :conjure.nfnl.module))
 (local client (autoload :conjure.client))
 (local log (autoload :conjure.log))
-(local n (autoload :nfnl.core))
+(local n (autoload :conjure.nfnl.core))
 (local state (autoload :grapple.client.state))
 (local str (autoload :conjure.nfnl.string))
 
