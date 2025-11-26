@@ -13,11 +13,8 @@ local result_header = "====== result ======"
 local stdout_header = "====== stdout ======"
 local stderr_header = "====== stderr ======"
 local ns = vim.api.nvim_create_namespace("grapple-log")
-local function highlight_lines(buf, start_line, end_line, hl_group)
-  for line = start_line, (end_line - 1) do
-    vim.api.nvim_buf_add_highlight(buf, ns, hl_group, line, 0, -1)
-  end
-  return nil
+local function highlight_lines(buf, start, _end, hl_group)
+  return vim.api.nvim_buf_set_extmark(buf, ns, start, 0, {end_row = _end, hl_group = hl_group, priority = 200})
 end
 local function log_buf_name()
   return str.join({"conjure-log-", vim.fn.getpid(), client.get("buf-suffix")})
@@ -26,45 +23,42 @@ local function append(sec, lines, opts)
   if not n["empty?"](lines) then
     local buf = vim.fn.bufnr(log_buf_name())
     local curr_sec = state.get("log-sec")
-    if (curr_sec ~= sec) then
-      n.assoc(state.get(), "log-sec", sec)
-      local header
-      if (sec == "info") then
-        header = info_header
-      elseif (sec == "error") then
-        header = error_header
-      elseif (sec == "input") then
-        header = input_header
-      elseif (sec == "result") then
-        header = result_header
-      elseif (sec == "stdout") then
-        header = stdout_header
-      elseif (sec == "stderr") then
-        header = stderr_header
-      else
-        header = nil
-      end
-      log.append({header})
-      local line_count = vim.api.nvim_buf_line_count(buf)
-      highlight_lines(buf, (line_count - 1), line_count, "Comment")
-    else
-    end
+    local add_heading_3f = (curr_sec ~= sec)
     local start_line = vim.api.nvim_buf_line_count(buf)
-    log.append(lines, opts)
-    if start_line then
-      local end_line = vim.api.nvim_buf_line_count(buf)
+    local function _2_()
       if (sec == "info") then
-        return highlight_lines(buf, start_line, end_line, "Title")
+        return {info_header, "Title"}
       elseif (sec == "error") then
-        return highlight_lines(buf, start_line, end_line, "ErrorMsg")
+        return {error_header, "ErrorMsg"}
+      elseif (sec == "input") then
+        return {input_header, nil}
       elseif (sec == "stdout") then
-        return highlight_lines(buf, start_line, end_line, "String")
+        return {stdout_header, "String"}
       elseif (sec == "stderr") then
-        return highlight_lines(buf, start_line, end_line, "WarningMsg")
+        return {stderr_header, "WarningMsg"}
       else
         local _ = sec
-        return nil
+        return {result_header, nil}
       end
+    end
+    local _let_3_ = _2_()
+    local header = _let_3_[1]
+    local hl_group = _let_3_[2]
+    if add_heading_3f then
+      n.assoc(state.get(), "log-sec", sec)
+      log["immediate-append"]({header})
+      highlight_lines(buf, start_line, (start_line + 1), "Comment")
+    else
+    end
+    log["immediate-append"](lines, opts)
+    if hl_group then
+      local _5_
+      if add_heading_3f then
+        _5_ = 1
+      else
+        _5_ = 0
+      end
+      return highlight_lines(buf, (start_line + _5_), vim.api.nvim_buf_line_count(buf), hl_group)
     else
       return nil
     end

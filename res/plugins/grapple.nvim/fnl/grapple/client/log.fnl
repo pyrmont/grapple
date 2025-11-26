@@ -16,9 +16,10 @@
 (local ns (vim.api.nvim_create_namespace "grapple-log"))
 
 ; Apply highlight to a range of lines
-(fn highlight-lines [buf start-line end-line hl-group]
-  (for [line start-line (- end-line 1)]
-    (vim.api.nvim_buf_add_highlight buf ns hl-group line 0 -1)))
+(fn highlight-lines [buf start end hl-group]
+  (vim.api.nvim_buf_set_extmark buf ns start 0 {:end_row end
+                                                :hl_group hl-group
+                                                :priority 200}))
 
 (fn log-buf-name []
   (str.join ["conjure-log-" (vim.fn.getpid) (client.get :buf-suffix)]))
@@ -26,31 +27,28 @@
 (fn append [sec lines opts]
   (when (not (n.empty? lines))
     (let [buf (vim.fn.bufnr (log-buf-name))
-          curr-sec (state.get :log-sec)]
-      ; print heading if different to current section
-      (when (not= curr-sec sec)
+          curr-sec (state.get :log-sec)
+          add-heading? (not= curr-sec sec)
+          start-line (vim.api.nvim_buf_line_count buf)
+          [header hl-group] (case sec
+                              :info   [info-header "Title"]
+                              :error  [error-header "ErrorMsg"]
+                              :input  [input-header nil]
+                              :stdout [stdout-header "String"]
+                              :stderr [stderr-header "WarningMsg"]
+                              _       [result-header nil])]
+      ; append heading if different to current section
+      (when add-heading?
         (n.assoc (state.get) :log-sec sec)
-        (let [header (case sec
-                       :info info-header
-                       :error error-header
-                       :input input-header
-                       :result result-header
-                       :stdout stdout-header
-                       :stderr stderr-header)]
-          (log.append [header])
-          (let [line-count (vim.api.nvim_buf_line_count buf)]
-            (highlight-lines buf (- line-count 1) line-count "Comment"))))
-      (let [start-line (vim.api.nvim_buf_line_count buf)]
-        (log.append lines opts)
-        (when start-line
-          (let [end-line (vim.api.nvim_buf_line_count buf)]
-            (case sec
-              :info (highlight-lines buf start-line end-line "Title")
-              :error (highlight-lines buf start-line end-line "ErrorMsg")
-              :stdout (highlight-lines buf start-line end-line "String")
-              :stderr (highlight-lines buf start-line end-line "WarningMsg")
-              ; for :input and :result, do nothing, let Janet syntax apply
-              _ nil)))))))
+        (log.immediate-append [header])
+        (highlight-lines buf start-line (+ start-line 1) "Comment"))
+      ; append the lines
+      (log.immediate-append lines opts)
+      (when hl-group
+        (highlight-lines buf
+                         (+ start-line (if add-heading? 1 0))
+                         (vim.api.nvim_buf_line_count buf)
+                         hl-group)))))
 
 (fn buf []
   (log.last-line)
