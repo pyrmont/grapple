@@ -51,7 +51,9 @@ jobs:
       run: |
         curl -fL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz -o nvim.tar.gz
         tar xzf nvim.tar.gz
-        sudo mv nvim-linux64/bin/nvim /usr/local/bin/nvim
+        sudo mv nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+        sudo mkdir -p /usr/local/share/nvim
+        sudo cp -r nvim-linux-x86_64/share/nvim/* /usr/local/share/nvim/
     - name: "run client unit tests"
       shell: bash
       run: ./res/scripts/unit-tests
