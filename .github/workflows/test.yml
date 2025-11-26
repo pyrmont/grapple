@@ -49,9 +49,9 @@ jobs:
     - name: "install neovim"
       shell: bash
       run: |
-        sudo add-apt-repository -y ppa:neovim-ppa/stable
-        sudo apt-get update
-        sudo apt-get install -y neovim
+        curl -fL https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz -o nvim.tar.gz
+        tar xzf nvim.tar.gz
+        sudo mv nvim-linux64/bin/nvim /usr/local/bin/nvim
     - name: "run client unit tests"
       shell: bash
       run: ./res/scripts/unit-tests
