@@ -10,14 +10,12 @@
     (setdyn :grapple/log-level log-level)
     (u/log "Connection opened")
     (def recv (t/make-recv conn))
-    (def buf @"")
-    (def sendb (t/make-send buf))
+    (def f (ev/to-file conn))
+    (def send (t/make-send f))
     (forever
       (def req (recv))
       (if (nil? req) (break))
-      (h/handle req sessions sendb)
-      (:write conn buf)
-      (buffer/clear buf))
+      (h/handle req sessions send))
     (u/log "Connection closed")))
 
 (defn start [&named host port handler log-level]

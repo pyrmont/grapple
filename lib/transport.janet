@@ -29,6 +29,14 @@
     (u/log msg :debug :out)
     (buffer/push-word buf (length payload))
     (buffer/push-string buf payload)
-    (if (buffer? stream) # hack because of how suspension works inside print
+    (cond
+      # stream is a buffer
+      (buffer? stream)
       (buffer/push-string stream buf)
+      # stream is a file
+      (= :core/file (type stream))
+      (do
+        (file/write stream buf)
+        (file/flush stream))
+      # default
       (:write stream buf))))
