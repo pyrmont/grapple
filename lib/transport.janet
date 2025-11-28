@@ -3,7 +3,6 @@
 (import ../deps/medea :as json)
 (import ./utilities :as u)
 
-
 (defn make-recv [stream]
   (def buf @"")
   (fn :receiver []
@@ -21,7 +20,6 @@
       (def res (json/decode buf))
       (u/log res :debug :in)
       res)))
-
 
 (defn make-send [stream]
   (def buf @"")

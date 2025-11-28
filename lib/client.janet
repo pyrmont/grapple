@@ -2,7 +2,6 @@
 (import ./transport :as t)
 (import ./server :as s)
 
-
 (defn connect [&named host port]
   (default host s/default-host)
   (default port s/default-port)
@@ -15,7 +14,6 @@
     (do
       (u/log res)
       [nil nil nil])))
-
 
 (defn disconnect [conn]
   (net/close conn))

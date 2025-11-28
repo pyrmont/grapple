@@ -1,9 +1,7 @@
 (import ./utilities :as util)
 (import ./evaluator :as eval)
 
-
 (def match-max 20)
-
 
 (def ops
   {"sess.new" {:req ["lang" "id"]}
@@ -18,14 +16,12 @@
    "env.doc" {:req ["lang" "id" "sess" "sym" "ns"]}
    "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}})
 
-
 (defn confirm [req ks send-err]
   (each k ks
     (unless (req k)
       (send-err (string "request missing key \"" k "\""))
       (break false)))
   true)
-
 
 (def- info-kvs
   {"janet/impl" ["janet" janet/version]
@@ -34,11 +30,8 @@
    "janet/prot" util/prot
    "janet/serv" util/proj})
 
-
-
 (defn- end-sess [sessions sess-id]
   (put (sessions :clients) sess-id nil))
-
 
 (defn- make-sess [sessions]
   (def count (inc (sessions :count)))
@@ -46,7 +39,6 @@
   (def sess-id (string count))
   (put (sessions :clients) sess-id true)
   sess-id)
-
 
 # Handle functions
 
@@ -57,30 +49,24 @@
     (break))
   (send-ret nil (merge {"sess" sess} info-kvs)))
 
-
 (defn sess-end [req sns send-ret send-err]
   (def sess (req "sess"))
   (end-sess sns sess)
   (send-ret nil))
 
-
 (defn sess-list [req sns send-ret send-err]
   (send-ret (keys (sns :clients))))
 
-
 (defn serv-info [req sns send-ret send-err]
   (send-ret nil info-kvs))
-
 
 # TODO: implement
 (defn serv-stop [req sns send-ret send-err]
   (send-ret "Server shutting down..."))
 
-
 # TODO: implement
 (defn serv-relo [req sns send-ret send-err]
   (send-ret "Server reloading..."))
-
 
 (defn env-eval [req sns send-ret send-err send]
   (def {"code" code
@@ -108,7 +94,6 @@
                      :req req))
   (send-ret res))
 
-
 (defn env-load [req sns send-ret send-err send]
   (def {"path" path} req)
   (def code (slurp path))
@@ -123,7 +108,6 @@
                      :send send
                      :req req))
   (send-ret res))
-
 
 (defn env-doc [req sns send-ret send-err]
   (def {"sym" sym-str
@@ -140,7 +124,6 @@
               {"janet/type" (type (bind :value))
                "janet/sm" (bind :source-map)})
     (send-err (string sym-str " not found"))))
-
 
 (defn env-cmpl [req sns send-ret send-err]
   (def {"sym" sym-str
@@ -170,7 +153,6 @@
       (set t nil)
       (set t (table/getproto t))))
   (send-ret (sort matches)))
-
 
 (defn handle [req sns send]
   (def send-ret (util/make-send-ret req send))

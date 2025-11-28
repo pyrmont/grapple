@@ -1,7 +1,6 @@
 (import ../deps/argy-bargy/argy-bargy :as argy)
 (import ./server :as server)
 
-
 (def config
   ```
   The configuration for Argy-Bargy
@@ -23,40 +22,25 @@
            "-------------------------------------------"]
    :info {:about "An mREPL server for Janet."}})
 
-
-(defn- args->opts
-  ```
-  Converts Argy-Bargy processed args into options for use with generate-doc
-  ```
-  [args]
-  @{:host (get-in args [:opts "host"])
-    :port (get-in args [:opts "port"])
-    :log-level (get-in args [:opts "logging"])})
-
-
 (defn run
   []
   (def parsed (argy/parse-args "grapple" config))
   (def err (parsed :err))
   (def help (parsed :help))
-
+  (def opts (parsed :opts))
   (cond
     (not (empty? help))
     (do
       (prin help)
-      (os/exit (if (get-in parsed [:opts "help"]) 0 1)))
-
+      (os/exit (if (opts "help") 0 1)))
     (not (empty? err))
     (do
       (eprin err)
       (os/exit 1))
-
-    (do
-      (def opts (args->opts parsed))
-      (server/start :host (opts :host)
-                    :port (opts :port)
-                    :log-level (opts :log-level)))))
-
+    # default
+    (server/start :host (opts "host")
+                  :port (opts "port")
+                  :log-level (opts "logging"))))
 
 # for testing in development
 (defn- main [& args] (run))

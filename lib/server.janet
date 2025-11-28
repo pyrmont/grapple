@@ -2,10 +2,8 @@
 (import ./handler :as h)
 (import ./transport :as t)
 
-
 (def default-host "127.0.0.1")
 (def default-port 3737)
-
 
 (defn- make-default-handler [sessions log-level]
   (fn :handler [conn]
@@ -22,15 +20,12 @@
       (buffer/clear buf))
     (u/log "Connection closed")))
 
-
 (defn start [&named host port handler log-level]
   (def sessions @{:count 0 :clients @{}})
-
   (default host default-host)
   (default port default-port)
   (default log-level :normal)
   (default handler (make-default-handler sessions log-level))
-
   (setdyn :grapple/log-level log-level)
   (u/log (string "Server starting at " host " on port " port "..."))
   (def server (net/listen host port))
@@ -43,7 +38,6 @@
            (break)
            (propagate e fib))))))
   server)
-
 
 (defn stop [s]
   (u/log "Server stopping...")

@@ -3,9 +3,7 @@
 (def prot ["mrepl" "1"])
 (def ns "<mrepl>")
 
-
 (def- log-levels {:off 0 :normal 1 :debug 2})
-
 
 (defn log [msg &opt level io]
   (default level :normal)
@@ -25,7 +23,6 @@
             "[DBG] ")))
       (printf (string prefix "%s") s))))
 
-
 (defn make-send-err [req send]
   (def {"op" op "id" id "sess" sess} req)
   (fn :err-sender [val &opt details]
@@ -38,12 +35,10 @@
     (send (cond
             (nil? details)
             resp
-
             (dictionary? details)
             (merge-into resp details)
-
+            # default
             (error "invalid argument: must be nil or dictionary")))))
-
 
 (defn make-send-note [req send]
   (def {"op" op "id" id "sess" sess} req)
@@ -57,12 +52,10 @@
     (send (cond
             (nil? details)
             resp
-
             (dictionary? details)
             (merge-into resp details)
-
+            # default
             (error "invalid argument: must be nil or dictionary")))))
-
 
 (defn make-send-out [req send ch]
   (def {"op" op "id" id "sess" sess} req)
@@ -74,7 +67,6 @@
            "sess" sess
            "ch" ch
            "val" val})))
-
 
 (defn make-send-ret [req send]
   (def {"op" op "id" id "sess" sess} req)
@@ -89,8 +81,7 @@
     (send (cond
             (nil? details)
             resp
-
             (dictionary? details)
             (merge-into resp details)
-
+            # default
             (error "invalid argument: must be nil or dictionary")))))

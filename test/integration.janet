@@ -5,7 +5,6 @@
 (import ../lib/server :as s)
 (import ../lib/client :as c)
 
-
 # Shared state between tests
 
 (var server nil)
