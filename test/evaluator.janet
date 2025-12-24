@@ -132,7 +132,7 @@
      "val" "Imported world\n"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true}}")
+  (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true} :grapple/dep-graph @{:dependents @{} :deps @{} :sources @{}}}")
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -169,7 +169,7 @@
      "val" "Imported world\n"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def expect-3-val "@{_ @{:value <cycle 0>}}")
+  (def expect-3-val "@{_ @{:value <cycle 0>} :grapple/dep-graph @{:dependents @{} :deps @{} :sources @{}}}")
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"

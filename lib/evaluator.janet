@@ -1,4 +1,5 @@
 (import ./utilities :as util)
+(import ./deps :as deps)
 
 (defn- dprint [v]
   (xprintf stdout "%q" v))
@@ -51,7 +52,7 @@
     (rebind new-env 'use new-use)
     (rebind new-env 'stdout (fn [& args] (xprin (dyn :out) ;args)))
     (rebind new-env 'stderr (fn [& args] (xprin (dyn :err) ;args)))
-    (put new-env :redef true)
+    (put new-env :redef false)
     (put new-env :debug true)
     (put new-env :module-make-env new-make-env)
     (put new-env :out (fn :out [x] (error "tried to output")))
@@ -153,9 +154,59 @@
      :normal 2
      :strict 3
      :all math/inf})
-  # Evaluate 1 source form in a protected manner
+  # dependency tracking
+  (defn- get-dep-graph []
+    (or (get env :grapple/dep-graph)
+        (let [g (deps/make-dep-graph)]
+          (put env :grapple/dep-graph g)
+          g)))
+  # forward declaration for mutual recursion
+  (var eval1 nil)
+  # track symbols currently being re-evaluated to prevent infinite loops
+  (def reevaluating @{})
+  (defn- reevaluate-dependents [sym]
+    "Re-evaluate all symbols that depend on sym"
+    (def graph (get-dep-graph))
+    (def to-reeval (deps/get-reevaluation-order graph sym))
+    # send informational message if there are dependents to re-evaluate
+    (unless (empty? to-reeval)
+      (def dep-names (string/join (map string to-reeval) ", "))
+      (note (string "Re-evaluating dependents of " sym ": " dep-names) {}))
+    # re-evaluate each dependent using stored source
+    (each dep to-reeval
+      # skip if already being re-evaluated (prevents circular dependency loops)
+      (unless (in reevaluating dep)
+        (put reevaluating dep true)
+        (def source (get-in graph [:sources dep]))
+        (when source
+          # re-evaluate using eval1
+          (eval1 source))
+        (put reevaluating dep nil))))
+  # evaluate 1 source form in a protected manner
   (def lints @[])
-  (defn eval1 [source &opt l c]
+  (set eval1 (fn eval1-impl [source &opt l c]
+    # check if this is a redefinition (before tracking the new def)
+    (def graph (get-dep-graph))
+    (var is-redef false)
+    (var defined-sym nil)
+    # check if symbol already exists before tracking
+    (when (and (tuple? source) (> (length source) 1))
+      (def head (in source 0))
+      (when (or (= head 'def) (= head 'var) (= head 'defn) (= head 'defmacro))
+        (def pattern (in source 1))
+        # handle both symbols and patterns
+        (if (symbol? pattern)
+          (do
+            (set defined-sym pattern)
+            (set is-redef (not (nil? (get-in graph [:sources pattern])))))
+          # for patterns, check first symbol (they all share the same source)
+          (when (or (= head 'def) (= head 'var))
+            (def syms (deps/extract-pattern-symbols pattern))
+            (when (not (empty? syms))
+              (set defined-sym (get syms 0))
+              (set is-redef (not (nil? (get-in graph [:sources (get syms 0)])))))))))
+    # track the definition
+    (deps/track-definition graph source)
     (var good true)
     (var resumeval nil)
     (def f
@@ -189,8 +240,11 @@
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
       (when good
-        (set resumeval (on-status f res where l c)))))
-  # Handle parser error in the correct environment
+        (set resumeval (on-status f res where l c))))
+    # after successful evaluation, re-evaluate dependents if this was a redefinition
+    (when (and good is-redef defined-sym)
+      (reevaluate-dependents defined-sym))))
+  # handle parser error in the correct environment
   (defn parse-err [p where]
     (def f (coro
              (setdyn :err err)
@@ -200,7 +254,7 @@
   (defn prod-and-eval [p]
     (def tup (parser/produce p true))
     (eval1 (in tup 0) ;(tuple/sourcemap tup)))
-  # Parse and evaluate
+  # parse and evaluate
   (var pindex 0)
   (def len (length code))
   (if (= len 0) (parser/eof p))
@@ -212,7 +266,7 @@
     (when (= :error (parser/status p))
       (parse-err p where)
       (if (eval1-env :exit) (break))))
-  # Check final parser state
+  # check final parser state
   (unless (eval1-env :exit)
     (parser/eof p)
     (while (parser/has-more p)
