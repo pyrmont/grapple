@@ -15,7 +15,7 @@
 
 (fn display-error [desc msg]
   (log.append :error [desc])
-  (when msg
+  (when (and msg msg.janet/path msg.janet/line msg.janet/col)
     (log.append :error
                 [(.. " in " msg.janet/path
                      " on line " msg.janet/line

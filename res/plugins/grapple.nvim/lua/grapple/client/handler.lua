@@ -16,7 +16,7 @@ local function error_msg_3f(msg)
 end
 local function display_error(desc, msg)
   log.append("error", {desc})
-  if msg then
+  if (msg and msg["janet/path"] and msg["janet/line"] and msg["janet/col"]) then
     return log.append("error", {(" in " .. msg["janet/path"] .. " on line " .. msg["janet/line"] .. " at col " .. msg["janet/col"])})
   else
     return nil

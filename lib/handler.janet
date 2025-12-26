@@ -184,5 +184,11 @@
       # return value
       true)
     ([e f]
-     # (debug/stacktrace f)
-     (send-err (string "request failed: " e)))))
+     (def frames (debug/stack f))
+     (def top-frame (first frames))
+     (def details (when top-frame
+                    {"janet/path" (top-frame :source)
+                     "janet/line" (top-frame :source-line)
+                     "janet/col" (top-frame :source-column)
+                     "janet/stack" (util/stack f)}))
+     (send-err (string "request failed: " e) details))))

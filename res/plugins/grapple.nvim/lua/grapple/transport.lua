@@ -1,6 +1,6 @@
 -- [nfnl] fnl/grapple/transport.fnl
 local _local_1_ = require("conjure.nfnl.module")
-local autoload = _local_1_["autoload"]
+local autoload = _local_1_.autoload
 local n = autoload("conjure.nfnl.core")
 local bit = autoload("bit")
 local function encode(msg)

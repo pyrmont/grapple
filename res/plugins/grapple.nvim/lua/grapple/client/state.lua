@@ -1,6 +1,6 @@
 -- [nfnl] fnl/grapple/client/state.fnl
 local _local_1_ = require("conjure.nfnl.module")
-local autoload = _local_1_["autoload"]
+local autoload = _local_1_.autoload
 local client = autoload("conjure.client")
 local get
 local function _2_()

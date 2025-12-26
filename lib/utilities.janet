@@ -85,3 +85,10 @@
             (merge-into resp details)
             # default
             (error "invalid argument: must be nil or dictionary")))))
+
+(defn stack [f]
+  (map (fn [fr] {:name (fr :name)
+                 :path (fr :source)
+                 :line (fr :source-line)
+                 :col  (fr :source-column)})
+       (debug/stack f)))

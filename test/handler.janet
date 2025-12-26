@@ -224,12 +224,17 @@
             send)
   (def actual-2 (recv))
   (def expect-msg "request failed: could not open file path/to/nowhere.txt")
+  # Build expected message with location details from actual error
   (def expect-2 {"tag" "err"
                  "op" "env.load"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
-                 "val" expect-msg})
+                 "val" expect-msg
+                 "janet/path" (actual-2 "janet/path")
+                 "janet/line" (actual-2 "janet/line")
+                 "janet/col" (actual-2 "janet/col")
+                 "janet/stack" (actual-2 "janet/stack")})
   (is (== expect-2 actual-2))
   (is (zero? (ev/count chan))))
 

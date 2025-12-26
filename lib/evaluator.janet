@@ -59,13 +59,6 @@
     (put new-env :err (fn :err [x] (error "tried to output")))
     new-env))
 
-(defn- stack [f]
-  (map (fn [fr] {:name (fr :name)
-                 :path (fr :source)
-                 :line (fr :source-line)
-                 :col  (fr :source-column)})
-       (debug/stack f)))
-
 (defn- bad-compile [send-err]
   (fn :bad-compile [msg macrof where &opt line col]
     (def full-msg
@@ -75,7 +68,7 @@
     (def details {"janet/path" where
                   "janet/line" line
                   "janet/col" col
-                  "janet/stack" (if macrof (stack macrof))})
+                  "janet/stack" (if macrof (util/stack macrof))})
     (send-err full-msg details)))
 
 (defn- bad-parse [send-err]
@@ -103,7 +96,7 @@
                   {"janet/path" where
                    "janet/line" line
                    "janet/col" col
-                   "janet/stack" (stack f)})
+                   "janet/stack" (util/stack f)})
         # (if (get env :debug) (debugger f level))
         ))))
 
