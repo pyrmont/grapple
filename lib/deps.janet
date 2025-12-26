@@ -24,6 +24,114 @@
     :struct (mapcat symbol-name (values pattern))
     []))
 
+(defn macro-expand1
+  "Expand macros (reimplementation of macex1)"
+  [x]
+  # handle tables
+  (defn dotable [t on-value]
+    (def newt @{})
+    (var key (next t nil))
+    (while (not= nil key)
+      (def newk (macro-expand1 key))
+      (put newt (if (deep= key newk) key newk) (on-value (in t key)))
+      (set key (next t key)))
+    newt)
+  # expand bindings
+  (defn expand-bindings [x]
+    (case (type x)
+      :array (map expand-bindings x)
+      :tuple (tuple/slice (map expand-bindings x))
+      :table (dotable x expand-bindings)
+      :struct (table/to-struct (dotable x expand-bindings))
+      (macro-expand1 x)))
+  # expand defs
+  (defn expanddef [t]
+    (def last (in t (- (length t) 1)))
+    (def bound (in t 1))
+    (tuple/slice
+      (array/concat
+        @[(in t 0) (expand-bindings bound)]
+        (tuple/slice t 2 -2)
+        @[(macro-expand1 last)])))
+  # expand all
+  (defn expandall [t]
+    (def args (map macro-expand1 (tuple/slice t 1)))
+    (tuple (in t 0) ;args))
+  # expand functions
+  (defn expandfn [t]
+    (def t1 (in t 1))
+    (if (symbol? t1)
+      (do
+        (def args (map macro-expand1 (tuple/slice t 3)))
+        (tuple 'fn t1 (in t 2) ;args))
+      (do
+        (def args (map macro-expand1 (tuple/slice t 2)))
+        (tuple 'fn t1 ;args))))
+  # expand quasi-quotes
+  (defn expandqq [t]
+    (defn qq [x]
+      (case (type x)
+        :tuple (if (= :brackets (tuple/type x))
+                 ~[,;(map qq x)]
+                 (do
+                   (def x0 (get x 0))
+                   (if (= 'unquote x0)
+                     (tuple x0 (macro-expand1(get x 1)))
+                     (tuple/slice (map qq x)))))
+        :array (map qq x)
+        :table (table ;(map qq (kvs x)))
+        :struct (struct ;(map qq (kvs x)))
+        x))
+    (tuple (in t 0) (qq (in t 1))))
+  # specials
+  (def specs
+    {'set expanddef
+     'def expanddef
+     'do expandall
+     'fn expandfn
+     'if expandall
+     'quote identity
+     'quasiquote expandqq
+     'var expanddef
+     'while expandall
+     'break expandall
+     'upscope expandall})
+  # handle tuples
+  (defn dotup [t]
+    (if (= nil (next t)) (break ()))
+    (def h (in t 0))
+    (def s (in specs h))
+    (def entry (or (dyn h) {}))
+    (def m (do (def r (get entry :ref)) (if r (in r 0) (get entry :value))))
+    (def m? (in entry :macro))
+    (cond
+      s (keep-syntax t (s t))
+      m? (do (setdyn *macro-form* t) (m ;(tuple/slice t 1)))
+      (keep-syntax! t (map macro-expand1 t))))
+  # setup return
+  (def ret
+    (case (type x)
+      :tuple (if (= (tuple/type x) :brackets)
+               (tuple/brackets ;(map macro-expand1 x))
+               (dotup x))
+      :array (map macro-expand1 x)
+      :struct (table/to-struct (dotable x macro-expand1))
+      :table (dotable x macro-expand1)
+      x))
+  ret)
+
+(defn- macro-expand
+  [x]
+  (var previous x)
+  (var current (macro-expand1 x))
+  (var counter 0)
+  (while (deep-not= current previous)
+    (if (> (++ counter) 200)
+      (error "macro expansion too nested"))
+    (set previous current)
+    (set current (macro-expand1 current)))
+  current)
+
 (defn- walk-params
   "Extract parameter names from function parameter list"
   [params]
@@ -54,13 +162,13 @@
 #     (+= i 2))
 #   names)
 
-(defn extract-deps
+(defn- extract-deps
   "Extract dependencies using macex - expands all macros first, then analyzes.
   This handles all binding forms automatically without manual case handling."
   [form &opt initial-locals]
   (default initial-locals {})
   # First expand all macros
-  (def expanded (macex form))
+  (def expanded (macro-expand form))
   # Collect all def/var/fn bindings in the expanded form (these are local to this expression)
   (def local-bindings (merge initial-locals))
   (defn collect-bindings [x]
