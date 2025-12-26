@@ -96,7 +96,7 @@
     (it "handles env.eval messages with return value"
       (fn []
         (let [msg {:op "env.eval" :tag "ret" :val "42"}]
-          (handler.handle-message msg nil)
+          (handler.handle-message msg {})
           ;; Should log to result
           (assert.equals 1 (length log-calls))
           (assert.equals :result (. (. log-calls 1) :sec))
@@ -106,7 +106,7 @@
     (it "handles env.load messages like env.eval"
       (fn []
         (let [msg {:op "env.load" :tag "ret" :val "loaded"}]
-          (handler.handle-message msg nil)
+          (handler.handle-message msg {})
           ;; Should log to result
           (assert.equals 1 (length log-calls))
           (assert.equals :result (. (. log-calls 1) :sec)))))

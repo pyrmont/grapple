@@ -89,7 +89,7 @@ local function _7_()
   it("handles env.eval messages with stderr", _12_)
   local function _13_()
     local msg = {op = "env.eval", tag = "ret", val = "42"}
-    handler["handle-message"](msg, nil)
+    handler["handle-message"](msg, {})
     assert.equals(1, #log_calls)
     assert.equals("result", log_calls[1].sec)
     local lines = log_calls[1].lines
@@ -98,7 +98,7 @@ local function _7_()
   it("handles env.eval messages with return value", _13_)
   local function _14_()
     local msg = {op = "env.load", tag = "ret", val = "loaded"}
-    handler["handle-message"](msg, nil)
+    handler["handle-message"](msg, {})
     assert.equals(1, #log_calls)
     return assert.equals("result", log_calls[1].sec)
   end

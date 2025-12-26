@@ -1,6 +1,6 @@
 -- [nfnl] fnl/grapple/remote.fnl
 local _local_1_ = require("conjure.nfnl.module")
-local autoload = _local_1_["autoload"]
+local autoload = _local_1_.autoload
 local n = autoload("conjure.nfnl.core")
 local client = autoload("conjure.client")
 local log = autoload("conjure.log")
@@ -9,14 +9,14 @@ local trn = autoload("grapple.transport")
 local uuid = autoload("conjure.uuid")
 local function connect(opts)
   local conn = {decode = trn["make-decode"](), lang = opts.lang, msgs = {}, queue = {}, session = nil}
-  local function send(msg, action)
+  local function send(msg, opts0)
     local id = uuid.v4()
     n.assoc(msg, "id", id, "lang", conn.lang)
     if conn.session then
       n.assoc(msg, "sess", conn.session)
     else
     end
-    n["assoc-in"](conn, {"msgs", id}, {msg = msg, action = action})
+    n["assoc-in"](conn, {"msgs", id}, {msg = msg, opts = opts0})
     log.dbg("send", msg)
     return conn.sock:write(trn.encode(msg))
   end
@@ -27,8 +27,8 @@ local function connect(opts)
       local function _3_(msg)
         log.dbg("receive", msg)
         local id = msg.req
-        local action = n["get-in"](conn, {"msgs", id, "action"})
-        return opts["on-message"](msg, action)
+        local req_opts = n["get-in"](conn, {"msgs", id, "opts"})
+        return opts["on-message"](msg, req_opts)
       end
       return n["run!"](_3_, conn.decode(chunk))
     end

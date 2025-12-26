@@ -22,12 +22,12 @@
      :queue []
      :session nil})
 
-  (fn send [msg action]
+  (fn send [msg opts]
     (let [id (uuid.v4)]
       (n.assoc msg :id id :lang conn.lang)
       (when conn.session
         (n.assoc msg :sess conn.session))
-      (n.assoc-in conn [:msgs id] {:msg msg :action action})
+      (n.assoc-in conn [:msgs id] {:msg msg :opts opts})
       (log.dbg "send" msg)
       (conn.sock:write (trn.encode msg))))
 
@@ -39,8 +39,8 @@
              (fn [msg]
                (log.dbg "receive" msg)
                (let [id msg.req
-                     action (n.get-in conn [:msgs id :action])]
-                 (opts.on-message msg action)))))))
+                     req-opts (n.get-in conn [:msgs id :opts])]
+                 (opts.on-message msg req-opts)))))))
 
   (fn process-queue []
     (set conn.awaiting-process? false)

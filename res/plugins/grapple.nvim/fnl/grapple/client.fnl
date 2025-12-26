@@ -169,7 +169,12 @@
     (= "doc" action)
     (n.assoc opts :passive? true)
     (= "eval" action)
-    (n.assoc opts :passive? true)))
+    (n.assoc opts :passive? true))
+  (if (and opts.on-result opts.suppress-hud?)
+    (let [on-result opts.on-result]
+      (n.assoc opts :on-result (fn [result]
+                                 (on-result (.. "=> " result)))))
+    opts))
 
 {: buf-suffix
  : comment-node?

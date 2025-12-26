@@ -4,23 +4,23 @@
 
 (fn sess-new [conn opts]
   (conn.send {:op "sess.new"}
-             opts.action))
+             opts))
 
 (fn sess-end [conn opts]
   (conn.send {:op "sess.end"}
-             (if opts opts.action nil)))
+             opts))
 
 (fn sess-list [conn opts]
   (conn.send {:op "sess.list"}
-             opts.action))
+             opts))
 
 (fn serv-info [conn opts]
   (conn.send {:op "serv.info"}
-             opts.action))
+             opts))
 
 (fn serv-stop [conn opts]
   (conn.send {:op "serv.stop"}
-             opts.action))
+             opts))
 
 (fn serv-rest [conn opts]
   (log.append :error ["serv.rest is not supported"]))
@@ -32,12 +32,12 @@
               :code opts.code
               :col (n.get-in opts.range [:start 2] 1)
               :line (n.get-in opts.range [:start 1] 1)}
-             opts.action))
+             opts))
 
 (fn env-load [conn opts]
   (conn.send {:op "env.load"
               :path opts.file-path}
-             opts.action))
+             opts))
 
 (fn env-stop [conn opts]
   (log.append :error ["env.stop is not supported"]))
@@ -46,13 +46,13 @@
   (conn.send {:op "env.doc"
               :ns opts.file-path
               :sym opts.code}
-             opts.action))
+             opts))
 
 (fn env-cmpl [conn opts]
   (conn.send {:op "env.cmpl"
               :ns opts.file-path
               :sym opts.code}
-             opts.action))
+             opts))
 
 {: sess-new
  : sess-end

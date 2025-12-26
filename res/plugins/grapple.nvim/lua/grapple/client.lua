@@ -1,6 +1,6 @@
 -- [nfnl] fnl/grapple/client.fnl
 local _local_1_ = require("conjure.nfnl.module")
-local autoload = _local_1_["autoload"]
+local autoload = _local_1_.autoload
 local config = autoload("conjure.config")
 local handler = autoload("grapple.client.handler")
 local log = autoload("grapple.client.log")
@@ -152,11 +152,19 @@ local function on_exit()
 end
 local function modify_client_exec_fn_opts(action, f_name, opts)
   if ("doc" == action) then
-    return n.assoc(opts, "passive?", true)
+    n.assoc(opts, "passive?", true)
   elseif ("eval" == action) then
-    return n.assoc(opts, "passive?", true)
+    n.assoc(opts, "passive?", true)
   else
-    return nil
+  end
+  if (opts["on-result"] and opts["suppress-hud?"]) then
+    local on_result = opts["on-result"]
+    local function _19_(result)
+      return on_result(("=> " .. result))
+    end
+    return n.assoc(opts, "on-result", _19_)
+  else
+    return opts
   end
 end
 return {["buf-suffix"] = buf_suffix, ["comment-node?"] = comment_node_3f, ["comment-prefix"] = comment_prefix, ["start-server"] = start_server, ["stop-server"] = stop_server, connect = connect, disconnect = disconnect, ["def-str"] = def_str, ["doc-str"] = doc_str, ["eval-file"] = eval_file, ["eval-str"] = eval_str, ["form-node?"] = form_node_3f, ["modify-client-exec-fn-opts"] = modify_client_exec_fn_opts, ["on-exit"] = on_exit, ["on-filetype"] = on_filetype, ["on-load"] = on_load}

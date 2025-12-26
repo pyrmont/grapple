@@ -1,6 +1,6 @@
 -- [nfnl] fnl/grapple/client/handler.fnl
 local _local_1_ = require("conjure.nfnl.module")
-local autoload = _local_1_["autoload"]
+local autoload = _local_1_.autoload
 local editor = autoload("conjure.editor")
 local log = autoload("grapple.client.log")
 local n = autoload("conjure.nfnl.core")
@@ -30,7 +30,7 @@ local function handle_sess_new(resp)
   local serv_ver = resp["janet/serv"][2]
   return log.append("info", {("Connected to " .. upcase(serv_name, 1) .. " v" .. serv_ver .. " running " .. upcase(impl_name, 1) .. " v" .. impl_ver .. " as session " .. resp.sess)})
 end
-local function handle_env_eval(resp)
+local function handle_env_eval(resp, opts)
   if (nil == resp.val) then
     return nil
   elseif (("out" == resp.tag) and ("out" == resp.ch)) then
@@ -38,6 +38,10 @@ local function handle_env_eval(resp)
   elseif (("out" == resp.tag) and ("err" == resp.ch)) then
     return log.append("stderr", {resp.val})
   elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
+    if opts["on-result"] then
+      opts["on-result"](resp.val)
+    else
+    end
     return log.append("result", {resp.val})
   else
     return nil
@@ -48,16 +52,16 @@ local function handle_env_doc(resp, action)
     local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _4_
+    local _5_
     if not resp["janet/sm"] then
-      _4_ = "\n"
+      _5_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _4_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _5_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _4_)
+    sm_info = (resp["janet/type"] .. "\n" .. _5_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -76,7 +80,7 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_win_set_option(win, "scrolloff", 0)
     vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
     vim.api.nvim_win_set_option(win, "breakindent", true)
-    local function _7_()
+    local function _8_()
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       else
@@ -84,7 +88,7 @@ local function handle_env_doc(resp, action)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _7_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _8_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -99,8 +103,9 @@ local function handle_env_doc(resp, action)
     return nil
   end
 end
-local function handle_message(msg, action)
+local function handle_message(msg, opts)
   if msg then
+    local action = ((opts and opts.action) or nil)
     if error_msg_3f(msg) then
       return display_error(msg.val, msg)
     elseif ("sess.new" == msg.op) then
@@ -116,9 +121,9 @@ local function handle_message(msg, action)
     elseif ("serv.rest" == msg.op) then
       return __fnl_global__handle_2dserv_2drest(msg)
     elseif ("env.eval" == msg.op) then
-      return handle_env_eval(msg)
+      return handle_env_eval(msg, opts)
     elseif ("env.load" == msg.op) then
-      return handle_env_eval(msg)
+      return handle_env_eval(msg, opts)
     elseif ("env.stop" == msg.op) then
       return __fnl_global__handle_2denv_2dstop(msg)
     elseif ("env.doc" == msg.op) then

@@ -86,7 +86,7 @@ local function _14_()
     local function _19_(err)
       return nil
     end
-    local function _20_(msg, action)
+    local function _20_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _17_, ["on-failure"] = _18_, ["on-error"] = _19_, ["on-message"] = _20_})
@@ -130,7 +130,7 @@ local function _14_()
     local function _29_(err)
       return nil
     end
-    local function _30_(msg, action)
+    local function _30_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _27_, ["on-failure"] = _28_, ["on-error"] = _29_, ["on-message"] = _30_})
@@ -153,7 +153,7 @@ local function _14_()
     local function _35_(err)
       return nil
     end
-    local function _36_(msg, action)
+    local function _36_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _33_, ["on-failure"] = _34_, ["on-error"] = _35_, ["on-message"] = _36_})
@@ -176,7 +176,7 @@ local function _14_()
     local function _41_(err)
       return nil
     end
-    local function _42_(msg, action)
+    local function _42_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _39_, ["on-failure"] = _40_, ["on-error"] = _41_, ["on-message"] = _42_})
@@ -200,7 +200,7 @@ local function _14_()
     local function _47_(err)
       return nil
     end
-    local function _48_(msg, action)
+    local function _48_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _45_, ["on-failure"] = _46_, ["on-error"] = _47_, ["on-message"] = _48_})
@@ -223,7 +223,7 @@ local function _14_()
     local function _53_(err)
       return nil
     end
-    local function _54_(msg, action)
+    local function _54_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _51_, ["on-failure"] = _52_, ["on-error"] = _53_, ["on-message"] = _54_})
@@ -233,13 +233,14 @@ local function _14_()
       return "test-action"
     end
     action_fn = _55_
-    conn.send(msg, action_fn)
+    local opts = {action = action_fn}
+    conn.send(msg, opts)
     local stored = conn.msgs["test-uuid-1"]
     assert.is_table(stored)
     assert.equals(msg, stored.msg)
-    return assert.equals(action_fn, stored.action)
+    return assert.equals(opts, stored.opts)
   end
-  it("send stores message and action in msgs map", _50_)
+  it("send stores message and opts in msgs map", _50_)
   local function _56_()
     local conn
     local function _57_()
@@ -251,7 +252,7 @@ local function _14_()
     local function _59_(err)
       return nil
     end
-    local function _60_(msg, action)
+    local function _60_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _57_, ["on-failure"] = _58_, ["on-error"] = _59_, ["on-message"] = _60_})
@@ -276,7 +277,7 @@ local function _14_()
     local function _65_(err)
       return nil
     end
-    local function _66_(msg, action)
+    local function _66_(msg, opts)
       return nil
     end
     conn = remote.connect({host = "localhost", port = "9365", lang = "janet", ["on-success"] = _63_, ["on-failure"] = _64_, ["on-error"] = _65_, ["on-message"] = _66_})

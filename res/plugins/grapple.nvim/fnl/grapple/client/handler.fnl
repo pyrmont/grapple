@@ -32,7 +32,7 @@
                      " v" impl-ver
                      " as session " resp.sess)])))
 
-(fn handle-env-eval [resp]
+(fn handle-env-eval [resp opts]
   (if
     (= nil resp.val)
     nil ; do nothing if no value to print
@@ -44,7 +44,10 @@
     (log.append :stderr [resp.val])
 
     (and (= "ret" resp.tag) (not= nil resp.val))
-    (log.append :result [resp.val])))
+    (do
+      (when opts.on-result
+        (opts.on-result resp.val))
+      (log.append :result [resp.val]))))
 
 (fn handle-env-doc [resp action]
   (if
@@ -97,46 +100,47 @@
         (editor.go-to path line col)
         (display-error "Oh no")))))
 
-(fn handle-message [msg action]
+(fn handle-message [msg opts]
   (when msg
-   (if
-    (error-msg? msg)
-    (display-error msg.val msg)
+   (let [action (or (and opts opts.action) nil)]
+     (if
+      (error-msg? msg)
+      (display-error msg.val msg)
 
-    (= "sess.new" msg.op)
-    (handle-sess-new msg)
+      (= "sess.new" msg.op)
+      (handle-sess-new msg)
 
-    (= "sess.end" msg.op)
-    (handle-sess-end msg)
+      (= "sess.end" msg.op)
+      (handle-sess-end msg)
 
-    (= "sess.list" msg.op)
-    (handle-sess-list msg)
+      (= "sess.list" msg.op)
+      (handle-sess-list msg)
 
-    (= "serv.info" msg.op)
-    (handle-sess-info msg)
+      (= "serv.info" msg.op)
+      (handle-sess-info msg)
 
-    (= "serv.stop" msg.op)
-    (handle-serv-stop msg)
+      (= "serv.stop" msg.op)
+      (handle-serv-stop msg)
 
-    (= "serv.rest" msg.op)
-    (handle-serv-rest msg)
+      (= "serv.rest" msg.op)
+      (handle-serv-rest msg)
 
-    (= "env.eval" msg.op)
-    (handle-env-eval msg)
+      (= "env.eval" msg.op)
+      (handle-env-eval msg opts)
 
-    (= "env.load" msg.op)
-    (handle-env-eval msg) ; OK?
+      (= "env.load" msg.op)
+      (handle-env-eval msg opts)
 
-    (= "env.stop" msg.op)
-    (handle-env-stop msg)
+      (= "env.stop" msg.op)
+      (handle-env-stop msg)
 
-    (= "env.doc" msg.op)
-    (handle-env-doc msg action)
+      (= "env.doc" msg.op)
+      (handle-env-doc msg action)
 
-    (= "env.cmpl" msg.op)
-    (handle-env-cmpl msg)
+      (= "env.cmpl" msg.op)
+      (handle-env-cmpl msg)
 
-    (do
-      (log.append :error ["Unrecognised message"])))))
+      (do
+        (log.append :error ["Unrecognised message"]))))))
 
 {: handle-message}

@@ -67,7 +67,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})]
+                                    :on-message (fn [msg opts] nil)})]
           ;; Should have send function
           (assert.is_function conn.send)
           ;; Should have decode function
@@ -108,7 +108,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           (conn.send msg (fn [] nil))
           ;; Should have UUID
@@ -122,7 +122,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           (conn.send msg (fn [] nil))
           ;; Should have lang
@@ -136,7 +136,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           ;; Set session
           (tset conn :session "test-session-123")
@@ -152,13 +152,13 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           (conn.send msg (fn [] nil))
           ;; Should not have session
           (assert.is_nil msg.sess))))
 
-    (it "send stores message and action in msgs map"
+    (it "send stores message and opts in msgs map"
       (fn []
         (let [conn (remote.connect {:host "localhost"
                                     :port "9365"
@@ -166,15 +166,16 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}
-              action-fn (fn [] "test-action")]
-          (conn.send msg action-fn)
+              action-fn (fn [] "test-action")
+              opts {:action action-fn}]
+          (conn.send msg opts)
           ;; Should store in msgs with UUID key
           (let [stored (. conn.msgs "test-uuid-1")]
             (assert.is_table stored)
             (assert.equals msg stored.msg)
-            (assert.equals action-fn stored.action)))))
+            (assert.equals opts stored.opts)))))
 
     (it "send writes encoded message to socket"
       (fn []
@@ -184,7 +185,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           (conn.send msg (fn [] nil))
           ;; Should have written to socket
@@ -201,7 +202,7 @@
                                     :on-success (fn [] nil)
                                     :on-failure (fn [err] nil)
                                     :on-error (fn [err] nil)
-                                    :on-message (fn [msg action] nil)})
+                                    :on-message (fn [msg opts] nil)})
               msg {:op "env.eval" :code "(+ 1 2)"}]
           (conn.send msg (fn [] nil))
           ;; Should have logged

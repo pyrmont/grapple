@@ -21,82 +21,82 @@
     (it "sends sess.new message with action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
           (request.sess-new conn opts)
           (assert.equals "sess.new" sent-msg.op)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "sess-end"
   (fn []
     (it "sends sess.end message with action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
           (request.sess-end conn opts)
           (assert.equals "sess.end" sent-msg.op)
-          (assert.equals opts.action sent-action))))
+          (assert.equals opts sent-opts))))
 
     (it "sends sess.end message with nil action when opts has no action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {}]
           (request.sess-end conn opts)
           (assert.equals "sess.end" sent-msg.op)
-          (assert.is_nil sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "sess-list"
   (fn []
     (it "sends sess.list message with action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
           (request.sess-list conn opts)
           (assert.equals "sess.list" sent-msg.op)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "serv-info"
   (fn []
     (it "sends serv.info message with action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
           (request.serv-info conn opts)
           (assert.equals "serv.info" sent-msg.op)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "serv-stop"
   (fn []
     (it "sends serv.stop message with action"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
           (request.serv-stop conn opts)
           (assert.equals "serv.stop" sent-msg.op)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "serv-rest"
   (fn []
@@ -125,10 +125,10 @@
     (it "sends env.eval message with code and position"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:code "(+ 1 2)"
                     :file-path "/path/to/file.janet"
                     :range {:start [10 5]}
@@ -139,7 +139,7 @@
           (assert.equals "/path/to/file.janet" sent-msg.ns)
           (assert.equals 10 sent-msg.line)
           (assert.equals 5 sent-msg.col)
-          (assert.equals opts.action sent-action)
+          (assert.equals opts sent-opts)
           ;; Should have logged the input
           (assert.equals 1 (length log-calls))
           (assert.equals :input (. (. log-calls 1) :sec)))))
@@ -174,16 +174,16 @@
     (it "sends env.load message with file path"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:file-path "/path/to/file.janet"
                     :action (fn [] "test-action")}]
           (request.env-load conn opts)
           (assert.equals "env.load" sent-msg.op)
           (assert.equals "/path/to/file.janet" sent-msg.path)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "env-stop"
   (fn []
@@ -208,10 +208,10 @@
     (it "sends env.doc message with symbol and namespace"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:code "defn"
                     :file-path "/path/to/file.janet"
                     :action (fn [] "test-action")}]
@@ -219,17 +219,17 @@
           (assert.equals "env.doc" sent-msg.op)
           (assert.equals "defn" sent-msg.sym)
           (assert.equals "/path/to/file.janet" sent-msg.ns)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 (describe "env-cmpl"
   (fn []
     (it "sends env.cmpl message with symbol and namespace"
       (fn []
         (var sent-msg nil)
-        (var sent-action nil)
-        (let [conn {:send (fn [msg action]
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
                             (set sent-msg msg)
-                            (set sent-action action))}
+                            (set sent-opts opts))}
               opts {:code "def"
                     :file-path "/path/to/file.janet"
                     :action (fn [] "test-action")}]
@@ -237,7 +237,7 @@
           (assert.equals "env.cmpl" sent-msg.op)
           (assert.equals "def" sent-msg.sym)
           (assert.equals "/path/to/file.janet" sent-msg.ns)
-          (assert.equals opts.action sent-action))))))
+          (assert.equals opts sent-opts))))))
 
 ;; Restore original log module after all tests
 (tset package.loaded :grapple.client.log original-log)
