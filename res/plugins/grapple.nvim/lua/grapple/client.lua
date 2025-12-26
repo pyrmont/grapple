@@ -142,6 +142,10 @@ local function on_filetype()
     return connect()
   end
   mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _17_, {desc = "Connect to a REPL"})
+  local function _18_()
+    return start_server({})
+  end
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _18_, {desc = "Start the Grapple server"})
   return mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
 end
 local function on_load()
@@ -159,10 +163,10 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _19_(result)
+    local function _20_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _19_)
+    return n.assoc(opts, "on-result", _20_)
   else
     return opts
   end

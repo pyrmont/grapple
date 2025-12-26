@@ -153,6 +153,11 @@
     #(connect)
     {:desc "Connect to a REPL"})
   (mapping.buf
+    :JanetStart
+    (config.get-in [:client :janet :mrepl :mapping :start-server])
+    #(start-server {})
+    {:desc "Start the Grapple server"})
+  (mapping.buf
     :JanetStop
     (config.get-in [:client :janet :mrepl :mapping :stop-server])
     stop-server
