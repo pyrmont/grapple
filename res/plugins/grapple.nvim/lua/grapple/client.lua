@@ -41,12 +41,13 @@ local function start_server(opts)
       else
         local full_cmd = vim.list_extend(vim.fn.copy(base_cmd), {"--host", host, "--port", tostring(current_port)})
         local job_id = vim.fn.jobstart(full_cmd)
+        n.assoc(state.get(), "server-pid", job_id)
+        n.assoc(state.get(), "server-port", tostring(current_port))
         local function _3_()
           if process_alive_3f(job_id) then
-            n.assoc(state.get(), "server-pid", job_id)
-            n.assoc(state.get(), "server-port", tostring(current_port))
             return log.append("info", {("Server started successfully on port " .. current_port)})
           else
+            n.assoc(state.get(), "server-pid", nil)
             log.append("info", {("Port " .. current_port .. " unavailable, trying " .. (current_port + 1) .. "...")})
             return try_port((attempt + 1), (current_port + 1))
           end

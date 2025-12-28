@@ -61,15 +61,17 @@
             (let [; Build full command with server arguments (copy to avoid mutation)
                   full-cmd (vim.list_extend (vim.fn.copy base-cmd) ["--host" host "--port" (tostring current-port)])
                   job-id (vim.fn.jobstart full-cmd)]
+              ; Set PID immediately to prevent duplicate starts
+              (n.assoc (state.get) :server-pid job-id)
+              (n.assoc (state.get) :server-port (tostring current-port))
               ; Wait 1 second then check if job is alive
               (vim.defer_fn
                 (fn []
                   (if (process-alive? job-id)
+                    (log.append :info [(.. "Server started successfully on port " current-port)])
                     (do
-                      (n.assoc (state.get) :server-pid job-id)
-                      (n.assoc (state.get) :server-port (tostring current-port))
-                      (log.append :info [(.. "Server started successfully on port " current-port)]))
-                    (do
+                      ; Clear the PID if server failed to start
+                      (n.assoc (state.get) :server-pid nil)
                       (log.append :info [(.. "Port " current-port " unavailable, trying " (+ current-port 1) "...")])
                       (try-port (+ attempt 1) (+ current-port 1)))))
                 1000))))
