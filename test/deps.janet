@@ -696,24 +696,20 @@
     (array/push messages2 (parser/produce p)))
   # When x is redefined, it triggers:
   # 1. ret for x = 100
-  # 2. note about re-evaluating y, z
+  # 2. note about re-evaluating y, z (only top-level message)
   # 3. ret for y = 105
-  # 4. note about re-evaluating z (because y was redefined during cascade)
-  # 5. ret for z = 115 (first evaluation from step 2)
-  # 6. ret for z = 115 (second evaluation from step 4)
-  (is (= 6 (length messages2)))
+  # 4. ret for z = 115 (evaluated once)
+  # Note: No nested reevaluate-dependents calls because we're in a cascade,
+  # so z is only evaluated once (not twice)
+  (is (= 4 (length messages2)))
   (is (= "ret" (get-in messages2 [0 "tag"])))
   (is (= "100" (get-in messages2 [0 "val"])))
   (is (= "note" (get-in messages2 [1 "tag"])))
   (is (string/find "Re-evaluating dependents of x" (get-in messages2 [1 "val"])))
   (is (= "ret" (get-in messages2 [2 "tag"])))
   (is (= "105" (get-in messages2 [2 "val"])))
-  (is (= "note" (get-in messages2 [3 "tag"])))
-  (is (string/find "Re-evaluating dependents of y" (get-in messages2 [3 "val"])))
-  (is (= "ret" (get-in messages2 [4 "tag"])))
-  (is (= "115" (get-in messages2 [4 "val"])))
-  (is (= "ret" (get-in messages2 [5 "tag"])))
-  (is (= "115" (get-in messages2 [5 "val"])))
+  (is (= "ret" (get-in messages2 [3 "tag"])))
+  (is (= "115" (get-in messages2 [3 "val"])))
   # Verify cascading updates worked correctly
   (is (= 100 (get-value env 'x)))
   (is (= 105 (get-value env 'y)))

@@ -161,8 +161,8 @@
     "Re-evaluates all symbols that depend on sym"
     (def graph (get-dep-graph))
     (def to-reeval (deps/get-reeval-order graph sym))
-    # send informational message if there are dependents to re-evaluate
-    (unless (empty? to-reeval)
+    # send informational message only at the top level (when not already reevaluating)
+    (unless (or (empty? to-reeval) (not (empty? reevaluating)))
       (def dep-names (string/join (map string to-reeval) ", "))
       (note (string "Re-evaluating dependents of " sym ": " dep-names) {}))
     # re-evaluate each dependent using stored source
@@ -235,7 +235,8 @@
       (when good
         (set resumeval (on-status f res where l c))))
     # after successful evaluation, re-evaluate dependents if this was a redefinition
-    (when (and good is-redef defined-sym)
+    # but only at the top level - nested calls are already handled by the outer cascade
+    (when (and good is-redef defined-sym (empty? reevaluating))
       (reevaluate-dependents defined-sym))))
   # handle parser error in the correct environment
   (defn parse-err [p where]
