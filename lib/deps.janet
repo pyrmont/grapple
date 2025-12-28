@@ -226,7 +226,7 @@
   []
   @{:deps @{}        # sym -> [dependencies]
     :dependents @{}  # sym -> [symbols that depend on this]
-    :sources @{}})   # sym -> source form for re-evaluation
+    :sources @{}})   # sym -> {:form source :line num :col num}
 
 (defn extract-pattern-symbols
   "Extract all symbols from a destructuring pattern"
@@ -268,8 +268,9 @@
         (each sym syms
           # Store dependencies: sym -> [dependencies]
           (put (graph :deps) sym dep-list)
-          # Store source for re-evaluation
-          (put (graph :sources) sym source)
+          # Store source with line/column metadata for re-evaluation
+          (def [line col] (or (tuple/sourcemap source) [nil nil]))
+          (put (graph :sources) sym {:form source :line line :col col})
           # Update reverse index: for each dependency, add sym to its dependents
           (each dep dep-list
             (def dependents (or (get (graph :dependents) dep) @[]))
@@ -295,7 +296,8 @@
   all-deps)
 
 (defn topological-sort
-  "Sort symbols in dependency order (dependencies before dependents)"
+  "Sort symbols in dependency order (dependencies before dependents).
+  When dependency counts are equal, sort by line number (source order)."
   [graph syms]
   (def sym-set @{})
   (each s syms (put sym-set s true))
@@ -303,8 +305,18 @@
   (defn dep-count [sym]
     (def deps (or (get-in graph [:deps sym]) @[]))
     (length (filter (partial in sym-set) deps)))
-  # Sort by dependency count (symbols with fewer deps first)
-  (sorted syms (fn [a b] (< (dep-count a) (dep-count b)))))
+  # Get line number for a symbol, defaulting to infinity if unavailable
+  (defn line-number [sym]
+    (or (get-in graph [:sources sym :line]) math/inf))
+  # Sort by dependency count first, then by line number
+  (sorted syms (fn [a b]
+                 (def count-a (dep-count a))
+                 (def count-b (dep-count b))
+                 (if (= count-a count-b)
+                   # Secondary sort: by line number
+                   (< (line-number a) (line-number b))
+                   # Primary sort: by dependency count
+                   (< count-a count-b)))))
 
 (defn get-reevaluation-order
   "Get the list of symbols to re-evaluate when sym is redefined, in order"

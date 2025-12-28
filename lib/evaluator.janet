@@ -170,7 +170,7 @@
       # skip if already being re-evaluated (prevents circular dependency loops)
       (unless (in reevaluating dep)
         (put reevaluating dep true)
-        (def source (get-in graph [:sources dep]))
+        (def source (get-in graph [:sources dep :form]))
         (when source
           # re-evaluate using eval1
           (eval1 source))

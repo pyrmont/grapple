@@ -739,4 +739,26 @@
   (is (= 0 (length (graph :dependents))))
   (is (= 0 (length (graph :sources)))))
 
+(deftest deps-line-number-ordering
+  # Test that bindings with equal dependency counts are sorted by line number
+  (def graph (deps/make-dep-graph))
+
+  # Create a parser and parse code with multiple bindings on different lines
+  (def p (parser/new))
+  (parser/consume p "(def x 10)\n(def a (+ x 1))\n(def b (+ x 2))\n(def c (+ x 3))\n")
+
+  # Track all definitions
+  (while (parser/has-more p)
+    (def form (parser/produce p))
+    (deps/track-definition graph form))
+
+  # Get reevaluation order - should be sorted by line number
+  (def order (deps/get-reevaluation-order graph 'x))
+
+  # Verify order is by line number: a (line 2), b (line 3), c (line 4)
+  (is (= 3 (length order)))
+  (is (= 'a (get order 0)) "First symbol should be 'a' (line 2)")
+  (is (= 'b (get order 1)) "Second symbol should be 'b' (line 3)")
+  (is (= 'c (get order 2)) "Third symbol should be 'c' (line 4)"))
+
 (run-tests!)
