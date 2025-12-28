@@ -26,7 +26,7 @@
   (default handler (make-default-handler sessions log-level))
   (setdyn :grapple/log-level log-level)
   (u/log (string "Server starting at " host " on port " port "..."))
-  (def server (net/listen host port))
+  (def server (net/listen host port :stream true))
   (ev/go
     (fn :server []
       (try
