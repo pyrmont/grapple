@@ -573,7 +573,8 @@
      "val" "not-a-function"
      "janet/path" u/ns
      "janet/line" 1
-     "janet/col" 1})
+     "janet/col" 1
+     "janet/reeval?" false})
   (is (== expect-1 (get messages 0)))
   # Second message should be note about re-evaluation
   (def expect-2
@@ -621,7 +622,8 @@
      "val" "20"
      "janet/path" u/ns
      "janet/line" 1
-     "janet/col" 1})
+     "janet/col" 1
+     "janet/reeval?" false})
   (is (== expect-1 (get messages 0)))
   # Second message should be the informational note about re-evaluation
   (def expect-2
@@ -633,7 +635,7 @@
      "val" "Re-evaluating dependents of x: y"})
   (is (== expect-2 (get messages 1)))
   # Third message should be the return value from re-evaluating y
-  # Note: re-evaluated forms don't include line/col info
+  # This is a cascaded reevaluation, so grapple/secondary? is true
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -642,7 +644,8 @@
      "sess" "1"
      "done" false
      "val" "25"
-     "janet/path" u/ns})
+     "janet/path" u/ns
+     "janet/reeval?" true})
   (is (== expect-3 (get messages 2))))
 
 (deftest deps-file-load-clears-graph

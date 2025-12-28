@@ -48,7 +48,8 @@
 
     (and (= "ret" resp.tag) (not= nil resp.val))
     (do
-      (when opts.on-result
+      ; Only show virtual text for primary results (not cascaded reevaluations)
+      (when (and opts.on-result (not (. resp "janet/reeval?")))
         (opts.on-result resp.val))
       (log.append :result [resp.val]))))
 

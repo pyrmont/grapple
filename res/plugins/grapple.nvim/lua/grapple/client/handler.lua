@@ -40,7 +40,7 @@ local function handle_env_eval(resp, opts)
   elseif ("note" == resp.tag) then
     return log.append("note", {resp.val})
   elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
-    if opts["on-result"] then
+    if (opts["on-result"] and not resp["janet/reeval?"]) then
       opts["on-result"](resp.val)
     else
     end

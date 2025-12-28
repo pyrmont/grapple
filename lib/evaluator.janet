@@ -80,7 +80,7 @@
                   "janet/col" col})
     (send-err full-msg details)))
 
-(defn- debugger-on-status [env level send-ret send-err]
+(defn- debugger-on-status [env level send-ret send-err reevaluating]
   (fn :debugger [f x where line col]
     (def fs (fiber/status f))
     (if (= :dead fs)
@@ -90,7 +90,9 @@
                   {"done" false
                    "janet/path" where
                    "janet/line" line
-                   "janet/col" col}))
+                   "janet/col" col
+                   # Mark as reevaluation if in a cascade
+                   "janet/reeval?" (not (empty? reevaluating))}))
       (do
         (send-err (string (fiber/status f) ": " x)
                   {"janet/path" where
@@ -130,7 +132,9 @@
                         :grapple/eval-env? true})
     (table/setproto new-eval-env new-env))
   (def eval1-env (module-make-env env true))
-  (def on-status (debugger-on-status env 1 ret err))
+  # track symbols currently being re-evaluated to prevent infinite loops
+  (def reevaluating @{})
+  (def on-status (debugger-on-status env 1 ret err reevaluating))
   (def on-compile-error (bad-compile err))
   (def on-compile-warning (warn-compile note))
   (def on-parse-error (bad-parse err))
@@ -155,8 +159,6 @@
           g)))
   # forward declaration for mutual recursion
   (var eval1 nil)
-  # track symbols currently being re-evaluated to prevent infinite loops
-  (def reevaluating @{})
   (defn- reevaluate-dependents [sym]
     "Re-evaluates all symbols that depend on sym"
     (def graph (get-dep-graph))
