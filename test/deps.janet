@@ -2,6 +2,7 @@
 
 (import ../lib/utilities :as u)
 (import ../lib/evaluator :as e)
+(import ../lib/deps :as deps)
 
 # Utility Functions
 
@@ -643,5 +644,99 @@
      "val" "25"
      "janet/path" u/ns})
   (is (== expect-3 (get messages 2))))
+
+(deftest deps-file-load-clears-graph
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  # Build up a dependency graph with chained dependencies
+  (e/run "(def x 10)" :env env :send send :req req)
+  (e/run "(def y (+ x 5))" :env env :send send :req req)
+  (e/run "(def z (+ y 10))" :env env :send send :req req)
+  # Verify initial values
+  (is (= 10 (get-value env 'x)))
+  (is (= 15 (get-value env 'y)))
+  (is (= 25 (get-value env 'z)))
+  # Clear the graph (simulating what happens at the start of env-load)
+  (when-let [graph (get env :grapple/dep-graph)]
+    (deps/clear-graph graph))
+  # Re-evaluate all definitions as if loading a file from scratch
+  # This should NOT trigger any cascade re-evaluation messages
+  (buffer/clear outb)
+  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def y (+ x 5))" :env env :send send :req req)
+  (e/run "(def z (+ y 10))" :env env :send send :req req)
+  # Parse messages to verify no cascade occurred
+  (parser/consume p outb)
+  (def messages @[])
+  (while (parser/has-more p)
+    (array/push messages (parser/produce p)))
+  # Should have exactly 3 messages (one ret for each def)
+  # NO note messages about re-evaluation during the "file load"
+  (is (= 3 (length messages)))
+  (is (= "ret" (get-in messages [0 "tag"])))
+  (is (= "20" (get-in messages [0 "val"])))
+  (is (= "ret" (get-in messages [1 "tag"])))
+  (is (= "25" (get-in messages [1 "val"])))
+  (is (= "ret" (get-in messages [2 "tag"])))
+  (is (= "35" (get-in messages [2 "val"])))
+  # Verify final values are correct
+  (is (= 20 (get-value env 'x)))
+  (is (= 25 (get-value env 'y)))
+  (is (= 35 (get-value env 'z)))
+  # Now verify the graph was rebuilt correctly by checking that
+  # subsequent changes DO trigger cascades
+  (buffer/clear outb)
+  (e/run "(def x 100)" :env env :send send :req req)
+  # Parse messages
+  (parser/consume p outb)
+  (def messages2 @[])
+  (while (parser/has-more p)
+    (array/push messages2 (parser/produce p)))
+  # When x is redefined, it triggers:
+  # 1. ret for x = 100
+  # 2. note about re-evaluating y, z
+  # 3. ret for y = 105
+  # 4. note about re-evaluating z (because y was redefined during cascade)
+  # 5. ret for z = 115 (first evaluation from step 2)
+  # 6. ret for z = 115 (second evaluation from step 4)
+  (is (= 6 (length messages2)))
+  (is (= "ret" (get-in messages2 [0 "tag"])))
+  (is (= "100" (get-in messages2 [0 "val"])))
+  (is (= "note" (get-in messages2 [1 "tag"])))
+  (is (string/find "Re-evaluating dependents of x" (get-in messages2 [1 "val"])))
+  (is (= "ret" (get-in messages2 [2 "tag"])))
+  (is (= "105" (get-in messages2 [2 "val"])))
+  (is (= "note" (get-in messages2 [3 "tag"])))
+  (is (string/find "Re-evaluating dependents of y" (get-in messages2 [3 "val"])))
+  (is (= "ret" (get-in messages2 [4 "tag"])))
+  (is (= "115" (get-in messages2 [4 "val"])))
+  (is (= "ret" (get-in messages2 [5 "tag"])))
+  (is (= "115" (get-in messages2 [5 "val"])))
+  # Verify cascading updates worked correctly
+  (is (= 100 (get-value env 'x)))
+  (is (= 105 (get-value env 'y)))
+  (is (= 115 (get-value env 'z))))
+
+(deftest deps-clear-graph-function
+  # Test the clear-graph function itself
+  (def graph (deps/make-dep-graph))
+  # Track some definitions
+  (def source1 '(def foo 10))
+  (def source2 '(def bar (+ foo 5)))
+  (def source3 '(defn baz [] (* bar 2)))
+  (deps/track-definition graph source1)
+  (deps/track-definition graph source2)
+  (deps/track-definition graph source3)
+  # Verify graph has entries
+  (is (> (length (graph :deps)) 0))
+  (is (> (length (graph :sources)) 0))
+  # Clear the graph
+  (deps/clear-graph graph)
+  # Verify graph is empty
+  (is (= 0 (length (graph :deps))))
+  (is (= 0 (length (graph :dependents))))
+  (is (= 0 (length (graph :sources)))))
 
 (run-tests!)

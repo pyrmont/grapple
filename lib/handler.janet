@@ -1,5 +1,6 @@
 (import ./utilities :as util)
 (import ./evaluator :as eval)
+(import ./deps :as deps)
 
 (def match-max 20)
 
@@ -102,6 +103,10 @@
                       (def new-env (make-env))
                       (put module/cache path new-env)
                       new-env)))
+  # Clear dependency graph for this file before reloading
+  # This prevents cascading re-evaluations during file load
+  (when-let [graph (get eval-env :grapple/dep-graph)]
+    (deps/clear-graph graph))
   (def res (eval/run code
                      :env eval-env
                      :path path

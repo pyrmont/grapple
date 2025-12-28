@@ -316,3 +316,10 @@
   # Remove duplicates and sort in dependency order
   (def unique-deps (distinct all-dependents))
   (topological-sort graph unique-deps))
+
+(defn clear-graph
+  "Clear all entries in a dependency graph, resetting it to empty state"
+  [graph]
+  (put graph :deps @{})
+  (put graph :dependents @{})
+  (put graph :sources @{}))
