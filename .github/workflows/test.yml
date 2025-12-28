@@ -46,6 +46,9 @@ jobs:
     - name: "run tests"
       shell: bash
       run: 'for f in test/*.janet; do janet "$f" || { rc=$?; break; }; done; (exit ${rc:-0})'
+    - name: "install grapple"
+      shell: bash
+      run: janet -b .
     - name: "install neovim"
       shell: bash
       run: |
