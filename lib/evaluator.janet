@@ -158,9 +158,9 @@
   # track symbols currently being re-evaluated to prevent infinite loops
   (def reevaluating @{})
   (defn- reevaluate-dependents [sym]
-    "Re-evaluate all symbols that depend on sym"
+    "Re-evaluates all symbols that depend on sym"
     (def graph (get-dep-graph))
-    (def to-reeval (deps/get-reevaluation-order graph sym))
+    (def to-reeval (deps/get-reeval-order graph sym))
     # send informational message if there are dependents to re-evaluate
     (unless (empty? to-reeval)
       (def dep-names (string/join (map string to-reeval) ", "))

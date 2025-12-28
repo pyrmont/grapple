@@ -14,9 +14,7 @@
     unquote true
     upscope true})
 
-(defn- symbol-name
-  "Extract symbol name, handling destructuring patterns"
-  [pattern]
+(defn- symbol-name [pattern]
   (case (type pattern)
     :symbol [pattern]
     :tuple (mapcat symbol-name pattern)
@@ -24,9 +22,7 @@
     :struct (mapcat symbol-name (values pattern))
     []))
 
-(defn macro-expand1
-  "Expand macros (reimplementation of macex1)"
-  [x]
+(defn- macro-expand1 [x]
   # handle tables
   (defn dotable [t on-value]
     (def newt @{})
@@ -120,8 +116,7 @@
       x))
   ret)
 
-(defn- macro-expand
-  [x]
+(defn- macro-expand [x]
   (var previous x)
   (var current (macro-expand1 x))
   (var counter 0)
@@ -132,9 +127,7 @@
     (set current (macro-expand1 current)))
   current)
 
-(defn- walk-params
-  "Extract parameter names from function parameter list"
-  [params]
+(defn- walk-params [params]
   (def names @{})
   (each param params
     (cond
@@ -150,22 +143,7 @@
         (put names sym true))))
   names)
 
-# (defn- walk-let-bindings
-#   "Extract local names from let bindings"
-#   [bindings]
-#   (def names @{})
-#   (var i 0)
-#   (while (< i (length bindings))
-#     (def pattern (get bindings i))
-#     (each sym (symbol-name pattern)
-#       (put names sym true))
-#     (+= i 2))
-#   names)
-
-(defn- extract-deps
-  "Extract dependencies using macex - expands all macros first, then analyzes.
-  This handles all binding forms automatically without manual case handling."
-  [form &opt initial-locals]
+(defn- extract-deps [form &opt initial-locals]
   (default initial-locals {})
   # First expand all macros
   (def expanded (macro-expand form))
@@ -219,17 +197,50 @@
   (collect-deps expanded)
   (keys deps))
 
+(defn- find-transitive-dependents [graph sym &opt visited]
+  (default visited @{})
+  # Avoid cycles
+  (when (in visited sym)
+    (break @[]))
+  (put visited sym true)
+  (def direct-deps (or (get-in graph [:dependents sym]) @[]))
+  (def all-deps @[])
+  (each dep direct-deps
+    (array/push all-deps dep)
+    (array/concat all-deps (find-transitive-dependents graph dep visited)))
+  all-deps)
+
+(defn- topological-sort [graph syms]
+  (def sym-set @{})
+  (each s syms (put sym-set s true))
+  # Count dependencies within the set for each symbol
+  (defn dep-count [sym]
+    (def deps (or (get-in graph [:deps sym]) @[]))
+    (length (filter (partial in sym-set) deps)))
+  # Get line number for a symbol, defaulting to infinity if unavailable
+  (defn line-number [sym]
+    (or (get-in graph [:sources sym :line]) math/inf))
+  # Sort by dependency count first, then by line number
+  (sorted syms (fn [a b]
+                 (def count-a (dep-count a))
+                 (def count-b (dep-count b))
+                 (if (= count-a count-b)
+                   # Secondary sort: by line number
+                   (< (line-number a) (line-number b))
+                   # Primary sort: by dependency count
+                   (< count-a count-b)))))
+
 # Dependency graph management
 
-(defn make-dep-graph
-  "Create a new dependency graph"
-  []
-  @{:deps @{}        # sym -> [dependencies]
-    :dependents @{}  # sym -> [symbols that depend on this]
-    :sources @{}})   # sym -> {:form source :line num :col num}
+(defn clear-graph
+  "Clears all entries in a dependency graph, resetting it to empty state"
+  [graph]
+  (put graph :deps @{})
+  (put graph :dependents @{})
+  (put graph :sources @{}))
 
 (defn extract-pattern-symbols
-  "Extract all symbols from a destructuring pattern"
+  "Extracts all symbols from a destructuring pattern"
   [pattern]
   (def symbols @[])
   (defn walk [p]
@@ -242,8 +253,26 @@
   (walk pattern)
   symbols)
 
+(defn get-reeval-order
+  "Gets the list of symbols to re-evaluate when sym is redefined, in order"
+  [graph sym]
+  # Find all transitive dependents
+  (def all-dependents (find-transitive-dependents graph sym))
+  (when (empty? all-dependents)
+    (break @[]))
+  # Remove duplicates and sort in dependency order
+  (def unique-deps (distinct all-dependents))
+  (topological-sort graph unique-deps))
+
+(defn make-dep-graph
+  "Creates a new dependency graph"
+  []
+  @{:deps @{}        # sym -> [dependencies]
+    :dependents @{}  # sym -> [symbols that depend on this]
+    :sources @{}})   # sym -> {:form source :line num :col num}
+
 (defn track-definition
-  "Track dependencies for a definition form and update the graph"
+  "Tracks dependencies for a definition form and updates the graph"
   [graph source]
   (when (and (tuple? source) (> (length source) 1))
     (def head (in source 0))
@@ -279,59 +308,3 @@
             (put (graph :dependents) dep dependents)))
         # Return the first symbol that was defined
         (get syms 0)))))
-
-(defn find-transitive-dependents
-  "Find all symbols that transitively depend on sym"
-  [graph sym &opt visited]
-  (default visited @{})
-  # Avoid cycles
-  (when (in visited sym)
-    (break @[]))
-  (put visited sym true)
-  (def direct-deps (or (get-in graph [:dependents sym]) @[]))
-  (def all-deps @[])
-  (each dep direct-deps
-    (array/push all-deps dep)
-    (array/concat all-deps (find-transitive-dependents graph dep visited)))
-  all-deps)
-
-(defn topological-sort
-  "Sort symbols in dependency order (dependencies before dependents).
-  When dependency counts are equal, sort by line number (source order)."
-  [graph syms]
-  (def sym-set @{})
-  (each s syms (put sym-set s true))
-  # Count dependencies within the set for each symbol
-  (defn dep-count [sym]
-    (def deps (or (get-in graph [:deps sym]) @[]))
-    (length (filter (partial in sym-set) deps)))
-  # Get line number for a symbol, defaulting to infinity if unavailable
-  (defn line-number [sym]
-    (or (get-in graph [:sources sym :line]) math/inf))
-  # Sort by dependency count first, then by line number
-  (sorted syms (fn [a b]
-                 (def count-a (dep-count a))
-                 (def count-b (dep-count b))
-                 (if (= count-a count-b)
-                   # Secondary sort: by line number
-                   (< (line-number a) (line-number b))
-                   # Primary sort: by dependency count
-                   (< count-a count-b)))))
-
-(defn get-reevaluation-order
-  "Get the list of symbols to re-evaluate when sym is redefined, in order"
-  [graph sym]
-  # Find all transitive dependents
-  (def all-dependents (find-transitive-dependents graph sym))
-  (when (empty? all-dependents)
-    (break @[]))
-  # Remove duplicates and sort in dependency order
-  (def unique-deps (distinct all-dependents))
-  (topological-sort graph unique-deps))
-
-(defn clear-graph
-  "Clear all entries in a dependency graph, resetting it to empty state"
-  [graph]
-  (put graph :deps @{})
-  (put graph :dependents @{})
-  (put graph :sources @{}))

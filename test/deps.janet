@@ -753,7 +753,7 @@
     (deps/track-definition graph form))
 
   # Get reevaluation order - should be sorted by line number
-  (def order (deps/get-reevaluation-order graph 'x))
+  (def order (deps/get-reeval-order graph 'x))
 
   # Verify order is by line number: a (line 2), b (line 3), c (line 4)
   (is (= 3 (length order)))
