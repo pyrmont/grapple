@@ -37,6 +37,8 @@ local function handle_env_eval(resp, opts)
     return log.append("stdout", {resp.val})
   elseif (("out" == resp.tag) and ("err" == resp.ch)) then
     return log.append("stderr", {resp.val})
+  elseif ("note" == resp.tag) then
+    return log.append("note", {resp.val})
   elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
     if opts["on-result"] then
       opts["on-result"](resp.val)

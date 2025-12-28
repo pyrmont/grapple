@@ -43,6 +43,9 @@
     (and (= "out" resp.tag) (= "err" resp.ch))
     (log.append :stderr [resp.val])
 
+    (= "note" resp.tag)
+    (log.append :note [resp.val])
+
     (and (= "ret" resp.tag) (not= nil resp.val))
     (do
       (when opts.on-result

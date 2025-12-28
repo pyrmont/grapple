@@ -8,6 +8,7 @@
 (local info-header   "======= info =======")
 (local error-header  "====== error =======")
 (local input-header  "====== input =======")
+(local note-header   "======= note =======")
 (local result-header "====== result ======")
 (local stdout-header "====== stdout ======")
 (local stderr-header "====== stderr ======")
@@ -34,6 +35,7 @@
                               :info   [info-header "Title"]
                               :error  [error-header "ErrorMsg"]
                               :input  [input-header nil]
+                              :note   [note-header "Special"]
                               :stdout [stdout-header "String"]
                               :stderr [stderr-header "WarningMsg"]
                               _       [result-header nil])]

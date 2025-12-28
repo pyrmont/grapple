@@ -9,6 +9,7 @@ local str = autoload("conjure.nfnl.string")
 local info_header = "======= info ======="
 local error_header = "====== error ======="
 local input_header = "====== input ======="
+local note_header = "======= note ======="
 local result_header = "====== result ======"
 local stdout_header = "====== stdout ======"
 local stderr_header = "====== stderr ======"
@@ -32,6 +33,8 @@ local function append(sec, lines, opts)
         return {error_header, "ErrorMsg"}
       elseif (sec == "input") then
         return {input_header, nil}
+      elseif (sec == "note") then
+        return {note_header, "Special"}
       elseif (sec == "stdout") then
         return {stdout_header, "String"}
       elseif (sec == "stderr") then

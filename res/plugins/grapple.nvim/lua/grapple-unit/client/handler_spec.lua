@@ -97,13 +97,22 @@ local function _7_()
   end
   it("handles env.eval messages with return value", _13_)
   local function _14_()
+    local msg = {op = "env.eval", tag = "note", val = "Re-evaluating dependents of x: y, z"}
+    handler["handle-message"](msg, {})
+    assert.equals(1, #log_calls)
+    assert.equals("note", log_calls[1].sec)
+    local lines = log_calls[1].lines
+    return assert.equals("Re-evaluating dependents of x: y, z", lines[1])
+  end
+  it("handles env.eval messages with note", _14_)
+  local function _15_()
     local msg = {op = "env.load", tag = "ret", val = "loaded"}
     handler["handle-message"](msg, {})
     assert.equals(1, #log_calls)
     return assert.equals("result", log_calls[1].sec)
   end
-  it("handles env.load messages like env.eval", _14_)
-  local function _15_()
+  it("handles env.load messages like env.eval", _15_)
+  local function _16_()
     local msg = {tag = "err", val = "Compilation error", ["janet/path"] = "/path/to/file.janet", ["janet/line"] = 10, ["janet/col"] = 5}
     handler["handle-message"](msg, nil)
     assert.equals(2, #log_calls)
@@ -115,8 +124,8 @@ local function _7_()
     assert.equals("Compilation error", line1[1])
     return assert.equals(expected_location, line2[1])
   end
-  it("handles error messages", _15_)
-  local function _16_()
+  it("handles error messages", _16_)
+  local function _17_()
     local msg = {op = "unknown.op"}
     handler["handle-message"](msg, nil)
     assert.equals(1, #log_calls)
@@ -124,11 +133,11 @@ local function _7_()
     local lines = log_calls[1].lines
     return assert.equals("Unrecognised message", lines[1])
   end
-  it("handles unrecognized messages", _16_)
-  local function _17_()
+  it("handles unrecognized messages", _17_)
+  local function _18_()
     handler["handle-message"](nil, nil)
     return assert.equals(0, #log_calls)
   end
-  return it("handles nil messages gracefully", _17_)
+  return it("handles nil messages gracefully", _18_)
 end
 return describe("handle-message", _7_)

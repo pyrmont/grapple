@@ -110,6 +110,15 @@
           ;; Check for WarningMsg highlight
           (assert.is_true (> (count-extmarks-with-hl buf-num ns "WarningMsg") 0)))))
 
+    (it "highlights note content with Special"
+      (fn []
+        (let [buf-num (client-log.buf)
+              ns (vim.api.nvim_create_namespace "grapple-log")]
+          ;; Append note message
+          (client-log.append :note ["Re-evaluating dependents of x: y, z"] {})
+          ;; Check for Special highlight
+          (assert.is_true (> (count-extmarks-with-hl buf-num ns "Special") 0)))))
+
     (it "does not add highlights for input content"
       (fn []
         (let [buf-num (client-log.buf)

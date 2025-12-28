@@ -4,6 +4,8 @@
 (local get
   (client.new-state
     (fn []
-      {:conn nil})))
+      {:conn nil
+       :server-pid nil
+       :server-port nil})))
 
 {: get}

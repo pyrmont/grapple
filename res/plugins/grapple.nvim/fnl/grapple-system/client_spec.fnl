@@ -82,7 +82,8 @@
       (fn []
         ;; Start with custom port
         (client.start-server {:host "127.0.0.1" :port "9999"})
-        (vim.wait 500 (fn [] false))
+        ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
+        (vim.wait 1200 (fn [] false))
 
         ;; Should have started
         (assert.is_not_nil (state.get :server-pid))))
@@ -91,7 +92,8 @@
       (fn []
         ;; First cycle
         (client.start-server {:host "127.0.0.1" :port test-port})
-        (vim.wait 500 (fn [] false))
+        ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
+        (vim.wait 1200 (fn [] false))
         (let [pid1 (state.get :server-pid)]
           (assert.is_not_nil pid1)
 
@@ -101,7 +103,8 @@
 
           ;; Second cycle
           (client.start-server {:host "127.0.0.1" :port test-port})
-          (vim.wait 500 (fn [] false))
+          ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
+          (vim.wait 1200 (fn [] false))
           (let [pid2 (state.get :server-pid)]
             (assert.is_not_nil pid2)))))))
 

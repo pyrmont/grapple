@@ -103,6 +103,16 @@
           (let [lines (. (. log-calls 1) :lines)]
             (assert.equals "42" (. lines 1))))))
 
+    (it "handles env.eval messages with note"
+      (fn []
+        (let [msg {:op "env.eval" :tag "note" :val "Re-evaluating dependents of x: y, z"}]
+          (handler.handle-message msg {})
+          ;; Should log to note section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :note (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "Re-evaluating dependents of x: y, z" (. lines 1))))))
+
     (it "handles env.load messages like env.eval"
       (fn []
         (let [msg {:op "env.load" :tag "ret" :val "loaded"}]

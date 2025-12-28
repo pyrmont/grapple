@@ -82,7 +82,7 @@ local function _3_()
     local function _15_()
       return false
     end
-    vim.wait(500, _15_)
+    vim.wait(1200, _15_)
     return assert.is_not_nil(state.get("server-pid"))
   end
   it("uses provided host and port", _14_)
@@ -91,7 +91,7 @@ local function _3_()
     local function _17_()
       return false
     end
-    vim.wait(500, _17_)
+    vim.wait(1200, _17_)
     local pid1 = state.get("server-pid")
     assert.is_not_nil(pid1)
     client["stop-server"]()
@@ -104,7 +104,7 @@ local function _3_()
     local function _19_()
       return false
     end
-    vim.wait(500, _19_)
+    vim.wait(1200, _19_)
     local pid2 = state.get("server-pid")
     return assert.is_not_nil(pid2)
   end
