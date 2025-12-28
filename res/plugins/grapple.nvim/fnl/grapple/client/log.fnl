@@ -27,6 +27,8 @@
 
 (fn append [sec lines opts]
   (when (not (n.empty? lines))
+    ; Ensure log buffer exists
+    (log.last-line)
     (let [buf (vim.fn.bufnr (log-buf-name))
           curr-sec (state.get :log-sec)
           add-heading? (not= curr-sec sec)

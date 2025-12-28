@@ -22,6 +22,7 @@ local function log_buf_name()
 end
 local function append(sec, lines, opts)
   if not n["empty?"](lines) then
+    log["last-line"]()
     local buf = vim.fn.bufnr(log_buf_name())
     local curr_sec = state.get("log-sec")
     local add_heading_3f = (curr_sec ~= sec)

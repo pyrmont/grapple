@@ -62,7 +62,7 @@ local function with_conn_or_warn(f, opts)
   if conn then
     return f(conn)
   else
-    return log.append("info", {"Not connected to server"})
+    return log.append("error", {"Not connected to server"})
   end
 end
 local function connected_3f()
@@ -155,39 +155,40 @@ local function connect(opts)
   conn = remote.connect({host = host, port = port, lang = lang, ["on-message"] = handler["handle-message"], ["on-failure"] = _16_, ["on-success"] = _19_, ["on-error"] = _20_})
   return nil
 end
-local function try_ensure_conn()
-  if not connected_3f() then
-    return connect({["silent?"] = true})
-  else
-    return nil
-  end
-end
 local function eval_str(opts)
-  try_ensure_conn()
-  return request["env-eval"](state.get("conn"), opts)
+  local function _22_(conn)
+    return request["env-eval"](conn, opts)
+  end
+  return with_conn_or_warn(_22_, opts)
 end
 local function eval_file(opts)
-  try_ensure_conn()
-  return request["env-load"](state.get("conn"), opts)
+  local function _23_(conn)
+    return request["env-load"](conn, opts)
+  end
+  return with_conn_or_warn(_23_, opts)
 end
 local function doc_str(opts)
-  try_ensure_conn()
-  return request["env-doc"](state.get("conn"), opts)
+  local function _24_(conn)
+    return request["env-doc"](conn, opts)
+  end
+  return with_conn_or_warn(_24_, opts)
 end
 local function def_str(opts)
-  try_ensure_conn()
-  return request["env-doc"](state.get("conn"), opts)
+  local function _25_(conn)
+    return request["env-doc"](conn, opts)
+  end
+  return with_conn_or_warn(_25_, opts)
 end
 local function on_filetype()
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _23_()
+  local function _26_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _23_, {desc = "Connect to a REPL"})
-  local function _24_()
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _26_, {desc = "Connect to a REPL"})
+  local function _27_()
     return start_server({})
   end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _24_, {desc = "Start the Grapple server"})
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _27_, {desc = "Start the Grapple server"})
   return mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
 end
 local function on_load()
@@ -205,10 +206,10 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _26_(result)
+    local function _29_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _26_)
+    return n.assoc(opts, "on-result", _29_)
   else
     return opts
   end

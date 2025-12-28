@@ -79,7 +79,7 @@
   (let [conn (state.get :conn)]
     (if conn
       (f conn)
-      (log.append :info ["Not connected to server"]))))
+      (log.append :error ["Not connected to server"]))))
 
 (fn connected? []
   (if (state.get :conn)
@@ -161,25 +161,29 @@
              (display-conn-status err)
              (disconnect)))}))))
 
-(fn try-ensure-conn []
-  (when (not (connected?))
-    (connect {:silent? true})))
-
 (fn eval-str [opts]
-  (try-ensure-conn)
-  (request.env-eval (state.get :conn) opts))
+  (with-conn-or-warn
+    (fn [conn]
+      (request.env-eval conn opts))
+    opts))
 
 (fn eval-file [opts]
-  (try-ensure-conn)
-  (request.env-load (state.get :conn) opts))
+  (with-conn-or-warn
+    (fn [conn]
+      (request.env-load conn opts))
+    opts))
 
 (fn doc-str [opts]
-  (try-ensure-conn)
-  (request.env-doc (state.get :conn) opts))
+  (with-conn-or-warn
+    (fn [conn]
+      (request.env-doc conn opts))
+    opts))
 
 (fn def-str [opts]
-  (try-ensure-conn)
-  (request.env-doc (state.get :conn) opts))
+  (with-conn-or-warn
+    (fn [conn]
+      (request.env-doc conn opts))
+    opts))
 
 (fn on-filetype []
   (mapping.buf
