@@ -48,7 +48,7 @@
       (let [host (or opts.host (config.get-in [:client :janet :mrepl :connection :default_host]))
             initial-port (or opts.port (config.get-in [:client :janet :mrepl :connection :default_port]))
             max-attempts 5
-            grapple-cmd (or (vim.fn.exepath "grapple") "grapple")]
+            grapple-cmd (vim.fn.exepath "grapple")]
         (log.append :info [(.. "Starting server on port " initial-port "...")])
         (fn try-port [attempt current-port]
           (if (>= attempt max-attempts)

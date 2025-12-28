@@ -32,7 +32,7 @@ local function start_server(opts)
     local host = (opts.host or config["get-in"]({"client", "janet", "mrepl", "connection", "default_host"}))
     local initial_port = (opts.port or config["get-in"]({"client", "janet", "mrepl", "connection", "default_port"}))
     local max_attempts = 5
-    local grapple_cmd = (vim.fn.exepath("grapple") or "grapple")
+    local grapple_cmd = vim.fn.exepath("grapple")
     log.append("info", {("Starting server on port " .. initial_port .. "...")})
     local function try_port(attempt, current_port)
       if (attempt >= max_attempts) then
