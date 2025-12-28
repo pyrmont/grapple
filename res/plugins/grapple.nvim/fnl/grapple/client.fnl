@@ -48,12 +48,19 @@
       (let [host (or opts.host (config.get-in [:client :janet :mrepl :connection :default_host]))
             initial-port (or opts.port (config.get-in [:client :janet :mrepl :connection :default_port]))
             max-attempts 5
-            grapple-cmd (vim.fn.exepath "grapple")]
+            ; Allow override via GRAPPLE_PATH env var for testing
+            ; Can be either a path ("grapple") or a command ("janet lib/cli.janet")
+            grapple-path (or vim.env.GRAPPLE_PATH
+                             (vim.fn.exepath "grapple"))
+            ; Split command into array for jobstart
+            base-cmd (vim.split grapple-path " ")]
         (log.append :info [(.. "Starting server on port " initial-port "...")])
         (fn try-port [attempt current-port]
           (if (>= attempt max-attempts)
             (log.append :error [(.. "Failed to start server after " max-attempts " attempts")])
-            (let [job-id (vim.fn.jobstart [grapple-cmd "--host" host "--port" (tostring current-port)])]
+            (let [; Build full command with server arguments (copy to avoid mutation)
+                  full-cmd (vim.list_extend (vim.fn.copy base-cmd) ["--host" host "--port" (tostring current-port)])
+                  job-id (vim.fn.jobstart full-cmd)]
               ; Wait 1 second then check if job is alive
               (vim.defer_fn
                 (fn []

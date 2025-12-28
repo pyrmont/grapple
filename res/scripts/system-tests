@@ -35,6 +35,10 @@ XDG_DATA_HOME=$(pwd)/tmp/data
 XDG_STATE_HOME=$(pwd)/tmp/state
 export XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME
 
+# Point to local grapple source for testing (no installation needed)
+GRAPPLE_PATH="janet $(pwd)/lib/cli.janet"
+export GRAPPLE_PATH
+
 echo ""
 echo "Running system tests..."
 echo "NOTE: System tests may take several seconds as they start real servers."

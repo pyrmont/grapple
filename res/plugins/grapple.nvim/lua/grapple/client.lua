@@ -32,13 +32,15 @@ local function start_server(opts)
     local host = (opts.host or config["get-in"]({"client", "janet", "mrepl", "connection", "default_host"}))
     local initial_port = (opts.port or config["get-in"]({"client", "janet", "mrepl", "connection", "default_port"}))
     local max_attempts = 5
-    local grapple_cmd = vim.fn.exepath("grapple")
+    local grapple_path = (vim.env.GRAPPLE_PATH or vim.fn.exepath("grapple"))
+    local base_cmd = vim.split(grapple_path, " ")
     log.append("info", {("Starting server on port " .. initial_port .. "...")})
     local function try_port(attempt, current_port)
       if (attempt >= max_attempts) then
         return log.append("error", {("Failed to start server after " .. max_attempts .. " attempts")})
       else
-        local job_id = vim.fn.jobstart({grapple_cmd, "--host", host, "--port", tostring(current_port)})
+        local full_cmd = vim.list_extend(vim.fn.copy(base_cmd), {"--host", host, "--port", tostring(current_port)})
+        local job_id = vim.fn.jobstart(full_cmd)
         local function _3_()
           if process_alive_3f(job_id) then
             n.assoc(state.get(), "server-pid", job_id)
