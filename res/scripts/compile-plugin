@@ -10,11 +10,16 @@ cd res/plugins/grapple.nvim
 # Use find to locate all .fnl files in grapple (excluding test directories)
 find fnl/grapple -name "*.fnl" -type f | while read -r fnl_file; do
   echo "  Compiling $fnl_file..."
-  nvim --headless -n \
+  if ! nvim --headless -n \
     --cmd "set rtp+=." \
-    -c "silent! edit $fnl_file" \
-    -c "silent! write" \
-    -c "qa"
+    +"lua require('nfnl').setup()" \
+    -c "edit $fnl_file" \
+    -c "write" \
+    -c "qa" 2>&1 | grep -v "^$"; then
+    echo "  ERROR: Failed to compile $fnl_file"
+    cd ../../..
+    exit 1
+  fi
 done
 
 cd ../../..
