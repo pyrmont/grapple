@@ -110,6 +110,50 @@
                   "janet/col" col})
     (send-note full-msg details)))
 
+(defn- reeval-cross-dependents [import-list source-sym source-env sess send-note]
+  (each import-info import-list
+    (def {:file other-path :as imported-sym} import-info)
+    (def other-env (module/cache other-path))
+    (def other-graph (get-in sess [:dep-graph other-path]))
+    (when (and other-env other-graph)
+      # Update the imported binding to point to the current binding
+      (def source-binding (get source-env source-sym))
+      (when source-binding
+        (put other-env imported-sym source-binding))
+      # Find symbols in the other file that depend on the imported symbol
+      (def to-reeval (deps/get-reeval-order other-graph imported-sym))
+      (unless (empty? to-reeval)
+        (def dep-names (string/join (map string to-reeval) ", "))
+        (send-note (string "Re-evaluating in " other-path ": " dep-names) {}))
+      # Re-evaluate each dependent in the other file
+      (each other-dep to-reeval
+        (def source (get-in other-graph [:sources other-dep :form]))
+        (when source
+          # Compile and evaluate in the other file's environment
+          (def compiled (compile source other-env other-path))
+          (when (function? compiled)
+            (compiled))))
+      # Cascade: for each symbol we re-evaluated, check if it has importers
+      # and recursively trigger reevaluation in those importing files
+      (each other-dep to-reeval
+        (def importers (get-in other-graph [:importers other-dep] @[]))
+        (unless (empty? importers)
+          (reeval-cross-dependents importers other-dep other-env sess send-note))))))
+
+# Public functions
+
+(defn cross-reeval
+  "Triggers re-evaluation of cross-file dependents"
+  [path sess send-note]
+  (def graph (get-in sess [:dep-graph path]))
+  (def source-env (module/cache path))
+  # no dependency graph and source environment so return early
+  (unless (and graph source-env)
+    (break))
+  (eachp [sym import-list] (get graph :importers)
+    (unless (empty? import-list)
+      (reeval-cross-dependents import-list sym source-env sess send-note))))
+
 (defn eval-make-env [&opt parent]
   (default parent eval-root-env)
   (def env (make-env parent)))
@@ -179,7 +223,12 @@
         (when source
           # re-evaluate using eval1
           (eval1 source))
-        (put reevaluating dep nil))))
+        (put reevaluating dep nil)))
+    # re-evaluate cross-file dependents (only at top level)
+    (when (empty? reevaluating)
+      (def importers (get-in graph [:importers sym] @[]))
+      (unless (empty? importers)
+        (reeval-cross-dependents importers sym env sess note))))
   # evaluate 1 source form in a protected manner
   (def lints @[])
   (set eval1 (fn eval1-impl [source &opt l c]
@@ -204,7 +253,7 @@
               (set defined-sym (get syms 0))
               (set is-redef (not (nil? (get-in graph [:sources (get syms 0)])))))))))
     # track the definition
-    (deps/track-definition graph source)
+    (deps/track-definition graph source env path sess)
     (var good true)
     (var resumeval nil)
     (def f

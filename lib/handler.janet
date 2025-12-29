@@ -103,20 +103,24 @@
   (def code (slurp path))
   (def eval-env (or (module/cache path)
                     (do
-                      (def new-env (make-env))
+                      (def new-env (eval/eval-make-env))
                       (put module/cache path new-env)
                       new-env)))
   (def sess (get-in sns [:clients sess-id]))
   # Clear dependency graph for this file before reloading
   # This prevents cascading re-evaluations during file load
+  # But preserve :importers information as it represents external relationships
   (when-let [graph (get-in sess [:dep-graph path])]
-    (deps/clear-graph graph))
+    (deps/clear-graph graph :keep-imports? true))
   (def res (eval/run code
                      :env eval-env
                      :path path
                      :send send
                      :req req
                      :sess sess))
+  # Trigger cross-file re-evaluation after reload
+  (def send-note (util/make-send-note req send))
+  (eval/cross-reeval path sess send-note)
   (send-ret res))
 
 (defn env-doc [req sns send-ret send-err]
