@@ -9,13 +9,15 @@
 (defn setup []
   (table/clear sessions)
   (put sessions :count 1)
-  (put sessions :clients @{"1" true}))
+  (put sessions :clients @{"1" @{:dep-graph @{}}}))
 
 # Utility Functions
 
 (defn make-stream []
   (def chan (ev/chan 5))
-  [(fn [] (ev/take chan)) (fn [v] (ev/give chan v)) chan])
+  [(fn [] (ev/with-deadline 1 (ev/take chan)))
+   (fn [v] (ev/with-deadline 1 (ev/give chan v)))
+   chan])
 
 # Tests
 

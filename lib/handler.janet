@@ -38,7 +38,7 @@
   (def count (inc (sessions :count)))
   (put sessions :count count)
   (def sess-id (string count))
-  (put (sessions :clients) sess-id true)
+  (put (sessions :clients) sess-id @{:dep-graph @{}})
   sess-id)
 
 # Handle functions
@@ -73,7 +73,8 @@
   (def {"code" code
         "ns" ns
         "line" line
-        "col" col} req)
+        "col" col
+        "sess" sess-id} req)
   (unless (string? code)
     (send-err "code must be string")
     (break))
@@ -87,31 +88,35 @@
   (def parser (parser/new))
   (when (and line col)
     (parser/where parser line col))
+  (def sess (get-in sns [:clients sess-id]))
   (def res (eval/run code
                      :env eval-env
                      :parser parser
                      :path ns
                      :send send
-                     :req req))
+                     :req req
+                     :sess sess))
   (send-ret res))
 
 (defn env-load [req sns send-ret send-err send]
-  (def {"path" path} req)
+  (def {"path" path "sess" sess-id} req)
   (def code (slurp path))
   (def eval-env (or (module/cache path)
                     (do
                       (def new-env (make-env))
                       (put module/cache path new-env)
                       new-env)))
+  (def sess (get-in sns [:clients sess-id]))
   # Clear dependency graph for this file before reloading
   # This prevents cascading re-evaluations during file load
-  (when-let [graph (get eval-env :grapple/dep-graph)]
+  (when-let [graph (get-in sess [:dep-graph path])]
     (deps/clear-graph graph))
   (def res (eval/run code
                      :env eval-env
                      :path path
                      :send send
-                     :req req))
+                     :req req
+                     :sess sess))
   (send-ret res))
 
 (defn env-doc [req sns send-ret send-err]

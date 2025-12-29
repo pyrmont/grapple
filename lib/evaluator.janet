@@ -115,9 +115,10 @@
   (def env (make-env parent)))
 
 # based on run-context
-(defn run [code &named env parser path req send]
-  (unless (and env req send)
-    (error "missing :env, :req and :send parameters"))
+(defn run [code &named env parser path req send sess]
+  (unless (and env req send sess)
+    (error "missing :env, :req, :send and :sess parameters"))
+  (default path util/ns)
   (def err (util/make-send-err req send))
   (def note (util/make-send-note req send))
   (def out-1 (util/make-send-out req send "out"))
@@ -152,16 +153,18 @@
      :strict 3
      :all math/inf})
   # dependency tracking
-  (defn- get-dep-graph []
-    (or (get env :grapple/dep-graph)
+  (defn- get-dep-graph [path]
+    (or (get-in sess [:dep-graph path])
         (let [g (deps/make-dep-graph)]
-          (put env :grapple/dep-graph g)
+          (unless (get sess :dep-graph)
+            (put sess :dep-graph @{}))
+          (put-in sess [:dep-graph path] g)
           g)))
   # forward declaration for mutual recursion
   (var eval1 nil)
   (defn- reevaluate-dependents [sym]
     "Re-evaluates all symbols that depend on sym"
-    (def graph (get-dep-graph))
+    (def graph (get-dep-graph path))
     (def to-reeval (deps/get-reeval-order graph sym))
     # send informational message only at the top level (when not already reevaluating)
     (unless (or (empty? to-reeval) (not (empty? reevaluating)))
@@ -181,7 +184,7 @@
   (def lints @[])
   (set eval1 (fn eval1-impl [source &opt l c]
     # check if this is a redefinition (before tracking the new def)
-    (def graph (get-dep-graph))
+    (def graph (get-dep-graph path))
     (var is-redef false)
     (var defined-sym nil)
     # check if symbol already exists before tracking

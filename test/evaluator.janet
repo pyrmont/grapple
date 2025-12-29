@@ -17,6 +17,9 @@
    "id" "1"
    "sess" "1"})
 
+# Test session
+(def sess @{:dep-graph @{}})
+
 # Tests
 
 (deftest run-succeed-calculation
@@ -25,7 +28,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(+ 1 2)" :env env :send send :req req))
+    (e/run "(+ 1 2)" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -50,7 +53,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(print \"Hello world\")" :env env :send send :req req))
+    (e/run "(print \"Hello world\")" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -85,7 +88,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(xprint stdout \"Hello world\")" :env env :send send :req req))
+    (e/run "(xprint stdout \"Hello world\")" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -122,7 +125,7 @@
   (def env (e/eval-make-env))
   (def path (dyn :current-file))
   (def actual-1
-    (e/run "(import ../res/test/imported1)" :env env :send send :req req :path path))
+    (e/run "(import ../res/test/imported1)" :env env :send send :req req :path path :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -135,7 +138,7 @@
      "val" "Imported world\n"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true} :grapple/dep-graph @{:dependents @{} :deps @{} :sources @{}}}")
+  (def expect-3-val "@{_ @{:value <cycle 0>} imported1/x @{:private true}}")
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -160,7 +163,7 @@
   (def env (e/eval-make-env))
   (def path (dyn :current-file))
   (def actual-1
-    (e/run "(import ../res/test/imported2)" :env env :send send :req req :path path))
+    (e/run "(import ../res/test/imported2)" :env env :send send :req req :path path :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2
@@ -173,7 +176,7 @@
      "val" "Imported world\n"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
-  (def expect-3-val "@{_ @{:value <cycle 0>} :grapple/dep-graph @{:dependents @{} :deps @{} :sources @{}}}")
+  (def expect-3-val "@{_ @{:value <cycle 0>}}")
   (def expect-3
     {"tag" "ret"
      "op" "env/eval"
@@ -196,7 +199,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(print \"Hello world\"" :env env :send send :req req))
+    (e/run "(print \"Hello world\"" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-msg
@@ -220,7 +223,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(foo)" :env env :send send :req req))
+    (e/run "(foo)" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-msg
@@ -244,7 +247,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(defmacro foo [x] (x)) (foo 1)" :env env :send send :req req))
+    (e/run "(defmacro foo [x] (x)) (foo 1)" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2 {"tag" "ret"
@@ -281,7 +284,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(+ 1 nil)" :env env :send send :req req))
+    (e/run "(+ 1 nil)" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-msg
@@ -306,7 +309,7 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def actual-1
-    (e/run "(def x :deprecated 1) (inc x)" :env env :send send :req req))
+    (e/run "(def x :deprecated 1) (inc x)" :env env :send send :req req :sess sess))
   (is (nil? actual-1))
   (parser/consume p outb)
   (def expect-2 {"tag" "ret"

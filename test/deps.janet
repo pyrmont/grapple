@@ -10,6 +10,9 @@
   (fn :send [v]
     (buffer/push b (string/format "%q" v))))
 
+(defn make-sess []
+  @{:dep-graph @{}})
+
 # Generic eval request
 
 (def req
@@ -32,14 +35,15 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define x and y where y depends on x
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y (+ x 5))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y (+ x 5))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'x)))
   (is (= 15 (get-value env 'y)))
   # Redefine x, y should auto-update
   (buffer/clear outb)
-  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'x)))
   (is (= 25 (get-value env 'y))))
 
@@ -47,14 +51,15 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define var a and b where b depends on a
-  (e/run "(var a 10)" :env env :send send :req req)
-  (e/run "(def b (+ a 5))" :env env :send send :req req)
+  (e/run "(var a 10)" :env env :send send :req req :sess sess)
+  (e/run "(def b (+ a 5))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'a)))
   (is (= 15 (get-value env 'b)))
   # Redefine a, b should auto-update
   (buffer/clear outb)
-  (e/run "(var a 20)" :env env :send send :req req)
+  (e/run "(var a 20)" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'a)))
   (is (= 25 (get-value env 'b))))
 
@@ -62,23 +67,24 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test nested function calls
-  (e/run "(def x 5)" :env env :send send :req req)
-  (e/run "(def y 10)" :env env :send send :req req)
-  (e/run "(def z (+ (* x 2) y))" :env env :send send :req req)
+  (e/run "(def x 5)" :env env :send send :req req :sess sess)
+  (e/run "(def y 10)" :env env :send send :req req :sess sess)
+  (e/run "(def z (+ (* x 2) y))" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'z)))
   # Test let bindings within defs
-  (e/run "(def result1 (let [temp (+ x 1)] (* temp 2)))" :env env :send send :req req)
+  (e/run "(def result1 (let [temp (+ x 1)] (* temp 2)))" :env env :send send :req req :sess sess)
   (is (= 12 (get-value env 'result1)))
   # Test conditionals
-  (e/run "(def result2 (if (> x 3) (+ x y) y))" :env env :send send :req req)
+  (e/run "(def result2 (if (> x 3) (+ x y) y))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result2)))
   # Test do blocks
-  (e/run "(def result3 (do (+ x 1) (+ x y)))" :env env :send send :req req)
+  (e/run "(def result3 (do (+ x 1) (+ x y)))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result3)))
   # Redefine x, all dependents should update
   (buffer/clear outb)
-  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'x)))
   (is (= 50 (get-value env 'z)))
   (is (= 42 (get-value env 'result1)))
@@ -86,7 +92,7 @@
   (is (= 30 (get-value env 'result3)))
   # Redefine y, relevant dependents should update
   (buffer/clear outb)
-  (e/run "(def y 100)" :env env :send send :req req)
+  (e/run "(def y 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'y)))
   (is (= 140 (get-value env 'z)))
   (is (= 42 (get-value env 'result1)))  # Doesn't depend on y
@@ -97,22 +103,23 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define a macro and use it
-  (e/run "(defmacro double [x] ~(* 2 ,x))" :env env :send send :req req)
-  (e/run "(def y (double 5))" :env env :send send :req req)
+  (e/run "(defmacro double [x] ~(* 2 ,x))" :env env :send send :req req :sess sess)
+  (e/run "(def y (double 5))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'y)))
   # Redefine the macro, y should be re-evaluated with new macro
   (buffer/clear outb)
-  (e/run "(defmacro double [x] ~(* 3 ,x))" :env env :send send :req req)
+  (e/run "(defmacro double [x] ~(* 3 ,x))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'y)))
   # Test macro that references a value
-  (e/run "(def multiplier 4)" :env env :send send :req req)
-  (e/run "(defmacro mult [x] ~(* multiplier ,x))" :env env :send send :req req)
-  (e/run "(def z (mult 5))" :env env :send send :req req)
+  (e/run "(def multiplier 4)" :env env :send send :req req :sess sess)
+  (e/run "(defmacro mult [x] ~(* multiplier ,x))" :env env :send send :req req :sess sess)
+  (e/run "(def z (mult 5))" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'z)))
   # Redefine multiplier - this affects the macro expansion
   (buffer/clear outb)
-  (e/run "(def multiplier 10)" :env env :send send :req req)
+  (e/run "(def multiplier 10)" :env env :send send :req req :sess sess)
   # z should update because mult (which depends on multiplier) was redefined
   (is (= 50 (get-value env 'z))))
 
@@ -120,101 +127,104 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define global x
-  (e/run "(def x 10)" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
   # Define y with local x that shadows global - y should NOT depend on global x
-  (e/run "(def y (let [x 20] x))" :env env :send send :req req)
+  (e/run "(def y (let [x 20] x))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'x)))
   (is (= 20 (get-value env 'y)))
   # Redefine global x - y should NOT update
-  (e/run "(def x 100)" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'x)))
   (is (= 20 (get-value env 'y)))
   # Test let with outer reference (no shadowing)
-  (e/run "(def z (let [a x] (+ a 5)))" :env env :send send :req req)
+  (e/run "(def z (let [a x] (+ a 5)))" :env env :send send :req req :sess sess)
   (is (= 105 (get-value env 'z)))  # a=100 (from global x), result=105
   # Redefine x - z should update (let binds a to x)
-  (e/run "(def x 50)" :env env :send send :req req)
+  (e/run "(def x 50)" :env env :send send :req req :sess sess)
   (is (= 55 (get-value env 'z))))
 
 (deftest deps-function-parameter-shadowing
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test 1: Simple parameter shadowing
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(defn f [x] x)" :env env :send send :req req)
-  (e/run "(def result1 (f 20))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(defn f [x] x)" :env env :send send :req req :sess sess)
+  (e/run "(def result1 (f 20))" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'result1)))
   # Redefine global x - f should NOT be re-evaluated
-  (e/run "(def x 100)" :env env :send send :req req)
-  (e/run "(def result2 (f 30))" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
+  (e/run "(def result2 (f 30))" :env env :send send :req req :sess sess)
   (is (= 30 (get-value env 'result2)))
   # Test 2: Function that uses both parameter and global
-  (e/run "(defn g [y] (+ x y))" :env env :send send :req req)
-  (e/run "(def result3 (g 5))" :env env :send send :req req)
+  (e/run "(defn g [y] (+ x y))" :env env :send send :req req :sess sess)
+  (e/run "(def result3 (g 5))" :env env :send send :req req :sess sess)
   (is (= 105 (get-value env 'result3)))  # x=100, y=5
   # Redefine x - g should be re-evaluated
-  (e/run "(def x 50)" :env env :send send :req req)
-  (e/run "(def result4 (g 5))" :env env :send send :req req)
+  (e/run "(def x 50)" :env env :send send :req req :sess sess)
+  (e/run "(def result4 (g 5))" :env env :send send :req req :sess sess)
   (is (= 55 (get-value env 'result4)))
   # Test 3: Multiple parameters shadowing multiple globals
-  (e/run "(def a 1)" :env env :send send :req req)
-  (e/run "(def b 2)" :env env :send send :req req)
-  (e/run "(defn h [a b] (+ a b))" :env env :send send :req req)
-  (e/run "(def result5 (h 10 20))" :env env :send send :req req)
+  (e/run "(def a 1)" :env env :send send :req req :sess sess)
+  (e/run "(def b 2)" :env env :send send :req req :sess sess)
+  (e/run "(defn h [a b] (+ a b))" :env env :send send :req req :sess sess)
+  (e/run "(def result5 (h 10 20))" :env env :send send :req req :sess sess)
   (is (= 30 (get-value env 'result5)))
   # Redefine globals - h should NOT be re-evaluated
-  (e/run "(def a 100)" :env env :send send :req req)
-  (e/run "(def b 200)" :env env :send send :req req)
-  (e/run "(def result6 (h 10 20))" :env env :send send :req req)
+  (e/run "(def a 100)" :env env :send send :req req :sess sess)
+  (e/run "(def b 200)" :env env :send send :req req :sess sess)
+  (e/run "(def result6 (h 10 20))" :env env :send send :req req :sess sess)
   (is (= 30 (get-value env 'result6)))
   # Test 4: Destructuring parameters
-  (e/run "(def data [1 2 3])" :env env :send send :req req)
-  (e/run "(defn destructure [[x y]] (+ x y))" :env env :send send :req req)
-  (e/run "(def result7 (destructure [5 10]))" :env env :send send :req req)
+  (e/run "(def data [1 2 3])" :env env :send send :req req :sess sess)
+  (e/run "(defn destructure [[x y]] (+ x y))" :env env :send send :req req :sess sess)
+  (e/run "(def result7 (destructure [5 10]))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result7)))
   # Redefine x and data - destructure should NOT be re-evaluated (x is shadowed)
-  (e/run "(def x 999)" :env env :send send :req req)
-  (e/run "(def data [100 200 300])" :env env :send send :req req)
-  (e/run "(def result8 (destructure [5 10]))" :env env :send send :req req)
+  (e/run "(def x 999)" :env env :send send :req req :sess sess)
+  (e/run "(def data [100 200 300])" :env env :send send :req req :sess sess)
+  (e/run "(def result8 (destructure [5 10]))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result8)))
   # Test 5: Anonymous function with shadowing
-  (e/run "(def anon-f (fn [x] x))" :env env :send send :req req)
-  (e/run "(def result9 (anon-f 42))" :env env :send send :req req)
+  (e/run "(def anon-f (fn [x] x))" :env env :send send :req req :sess sess)
+  (e/run "(def result9 (anon-f 42))" :env env :send send :req req :sess sess)
   (is (= 42 (get-value env 'result9)))
   # Redefine x - anon-f should NOT be re-evaluated
-  (e/run "(def x 123)" :env env :send send :req req)
-  (e/run "(def result10 (anon-f 42))" :env env :send send :req req)
+  (e/run "(def x 123)" :env env :send send :req req :sess sess)
+  (e/run "(def result10 (anon-f 42))" :env env :send send :req req :sess sess)
   (is (= 42 (get-value env 'result10)))
   # Test 6: Named function (fn with name)
-  (e/run "(def named-f (fn my-func [x] x))" :env env :send send :req req)
-  (e/run "(def result11 (named-f 99))" :env env :send send :req req)
+  (e/run "(def named-f (fn my-func [x] x))" :env env :send send :req req :sess sess)
+  (e/run "(def result11 (named-f 99))" :env env :send send :req req :sess sess)
   (is (= 99 (get-value env 'result11)))
   # Test 7: Function with parameter and body that references a different global
-  (e/run "(def c 1000)" :env env :send send :req req)
-  (e/run "(defn mixed [x] (+ x c))" :env env :send send :req req)
-  (e/run "(def result12 (mixed 5))" :env env :send send :req req)
+  (e/run "(def c 1000)" :env env :send send :req req :sess sess)
+  (e/run "(defn mixed [x] (+ x c))" :env env :send send :req req :sess sess)
+  (e/run "(def result12 (mixed 5))" :env env :send send :req req :sess sess)
   (is (= 1005 (get-value env 'result12)))
   # Redefine x (shadowed) - mixed should NOT be re-evaluated
-  (e/run "(def x 777)" :env env :send send :req req)
-  (e/run "(def result13 (mixed 5))" :env env :send send :req req)
+  (e/run "(def x 777)" :env env :send send :req req :sess sess)
+  (e/run "(def result13 (mixed 5))" :env env :send send :req req :sess sess)
   (is (= 1005 (get-value env 'result13)))
   # Redefine c (used in body) - mixed should be re-evaluated
-  (e/run "(def c 2000)" :env env :send send :req req)
-  (e/run "(def result14 (mixed 5))" :env env :send send :req req)
+  (e/run "(def c 2000)" :env env :send send :req req :sess sess)
+  (e/run "(def result14 (mixed 5))" :env env :send send :req req :sess sess)
   (is (= 2005 (get-value env 'result14))))
 
 (deftest deps-no-dependents
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define x with no dependents
-  (e/run "(def x 10)" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'x)))
   # Redefine x - should work fine, no re-evaluations needed
   (buffer/clear outb)
-  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'x)))
   # Output should contain the return value but no re-evaluation notes
   (def p (parser/new))
@@ -230,161 +240,165 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test 1: Quoted symbol - should NOT depend on the symbol's value
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y 'x)" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y 'x)" :env env :send send :req req :sess sess)
   (is (= 'x (get-value env 'y)))
-  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
   (is (= 'x (get-value env 'y)))
   # Test 2: Quoted list - should NOT depend on symbols in the list
-  (e/run "(def z '(+ x 5))" :env env :send send :req req)
+  (e/run "(def z '(+ x 5))" :env env :send send :req req :sess sess)
   (is (= '(+ x 5) (get-value env 'z)))
-  (e/run "(def x 30)" :env env :send send :req req)
+  (e/run "(def x 30)" :env env :send send :req req :sess sess)
   (is (= '(+ x 5) (get-value env 'z)))
   # Test 3: Quoted tuple vs array
-  (e/run "(def a 1)" :env env :send send :req req)
-  (e/run "(def b 2)" :env env :send send :req req)
-  (e/run "(def tuple-quote '(a b))" :env env :send send :req req)
-  (e/run "(def array-quote '[a b])" :env env :send send :req req)
+  (e/run "(def a 1)" :env env :send send :req req :sess sess)
+  (e/run "(def b 2)" :env env :send send :req req :sess sess)
+  (e/run "(def tuple-quote '(a b))" :env env :send send :req req :sess sess)
+  (e/run "(def array-quote '[a b])" :env env :send send :req req :sess sess)
   (is (= '(a b) (get-value env 'tuple-quote)))
   (is (= '[a b] (get-value env 'array-quote)))
   # Redefine - neither should update
-  (e/run "(def a 100)" :env env :send send :req req)
+  (e/run "(def a 100)" :env env :send send :req req :sess sess)
   (is (= '(a b) (get-value env 'tuple-quote)))
   (is (= '[a b] (get-value env 'array-quote)))
   # Test 4: Quasiquote without unquote - should NOT depend
-  (e/run "(def quasi1 ~(+ x 5))" :env env :send send :req req)
+  (e/run "(def quasi1 ~(+ x 5))" :env env :send send :req req :sess sess)
   (is (= ~(+ x 5) (get-value env 'quasi1)))
-  (e/run "(def x 40)" :env env :send send :req req)
+  (e/run "(def x 40)" :env env :send send :req req :sess sess)
   (is (= ~(+ x 5) (get-value env 'quasi1)))
   # Test 5: Quasiquote with unquote - SHOULD depend on unquoted symbols
-  (e/run "(def quasi2 ~(+ ,x 5))" :env env :send send :req req)
+  (e/run "(def quasi2 ~(+ ,x 5))" :env env :send send :req req :sess sess)
   (is (= ~(+ ,40 5) (get-value env 'quasi2)))
-  (e/run "(def x 50)" :env env :send send :req req)
+  (e/run "(def x 50)" :env env :send send :req req :sess sess)
   (is (= ~(+ ,50 5) (get-value env 'quasi2)))
   # Test 6: Nested quoted forms
-  (e/run "(def c 7)" :env env :send send :req req)
-  (e/run "(def nested '(+ a '(* b c)))" :env env :send send :req req)
+  (e/run "(def c 7)" :env env :send send :req req :sess sess)
+  (e/run "(def nested '(+ a '(* b c)))" :env env :send send :req req :sess sess)
   (is (= '(+ a '(* b c)) (get-value env 'nested)))
-  (e/run "(def c 700)" :env env :send send :req req)
+  (e/run "(def c 700)" :env env :send send :req req :sess sess)
   (is (= '(+ a '(* b c)) (get-value env 'nested)))
   # Test 7: Mix of quoted and unquoted in a data structure
-  (e/run "(def d 8)" :env env :send send :req req)
-  (e/run "(def mixed [d 'x])" :env env :send send :req req)
+  (e/run "(def d 8)" :env env :send send :req req :sess sess)
+  (e/run "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (is (= [8 'x] (get-value env 'mixed)))
   # d changes, mixed should update (unquoted d)
-  (e/run "(def d 9)" :env env :send send :req req)
+  (e/run "(def d 9)" :env env :send send :req req :sess sess)
   (is (= [9 'x] (get-value env 'mixed)))
   # x changes, mixed should NOT update (quoted x)
-  (e/run "(def x 999)" :env env :send send :req req)
+  (e/run "(def x 999)" :env env :send send :req req :sess sess)
   (is (= [9 'x] (get-value env 'mixed))))
 
 (deftest deps-variadic-functions
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test 1: & (rest parameter) with global reference
-  (e/run "(def multiplier 10)" :env env :send send :req req)
-  (e/run "(defn f [a & rest] (+ a (* multiplier (length rest))))" :env env :send send :req req)
-  (e/run "(def result1 (f 5 1 2 3))" :env env :send send :req req)
+  (e/run "(def multiplier 10)" :env env :send send :req req :sess sess)
+  (e/run "(defn f [a & rest] (+ a (* multiplier (length rest))))" :env env :send send :req req :sess sess)
+  (e/run "(def result1 (f 5 1 2 3))" :env env :send send :req req :sess sess)
   (is (= 35 (get-value env 'result1)))  # 5 + (10 * 3) = 35
   # Redefine multiplier - f should be re-evaluated
-  (e/run "(def multiplier 100)" :env env :send send :req req)
-  (e/run "(def result2 (f 5 1 2 3))" :env env :send send :req req)
+  (e/run "(def multiplier 100)" :env env :send send :req req :sess sess)
+  (e/run "(def result2 (f 5 1 2 3))" :env env :send send :req req :sess sess)
   (is (= 305 (get-value env 'result2)))  # 5 + (100 * 3) = 305
   # Test 2: &opt (optional parameter) with global reference
-  (e/run "(defn g [a &opt b] (+ a (or b multiplier)))" :env env :send send :req req)
-  (e/run "(def result3 (g 10))" :env env :send send :req req)
+  (e/run "(defn g [a &opt b] (+ a (or b multiplier)))" :env env :send send :req req :sess sess)
+  (e/run "(def result3 (g 10))" :env env :send send :req req :sess sess)
   (is (= 110 (get-value env 'result3)))  # 10 + 100 = 110
-  (e/run "(def result4 (g 10 5))" :env env :send send :req req)
+  (e/run "(def result4 (g 10 5))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result4)))  # 10 + 5 = 15
   # Test 3: Multiple &opt parameters
-  (e/run "(def default1 20)" :env env :send send :req req)
-  (e/run "(def default2 30)" :env env :send send :req req)
-  (e/run "(defn h [a &opt b c] (+ a (or b default1) (or c default2)))" :env env :send send :req req)
-  (e/run "(def result5 (h 1))" :env env :send send :req req)
+  (e/run "(def default1 20)" :env env :send send :req req :sess sess)
+  (e/run "(def default2 30)" :env env :send send :req req :sess sess)
+  (e/run "(defn h [a &opt b c] (+ a (or b default1) (or c default2)))" :env env :send send :req req :sess sess)
+  (e/run "(def result5 (h 1))" :env env :send send :req req :sess sess)
   (is (= 51 (get-value env 'result5)))  # 1 + 20 + 30 = 51
-  (e/run "(def result6 (h 1 2))" :env env :send send :req req)
+  (e/run "(def result6 (h 1 2))" :env env :send send :req req :sess sess)
   (is (= 33 (get-value env 'result6)))  # 1 + 2 + 30 = 33
-  (e/run "(def result7 (h 1 2 3))" :env env :send send :req req)
+  (e/run "(def result7 (h 1 2 3))" :env env :send send :req req :sess sess)
   (is (= 6 (get-value env 'result7)))  # 1 + 2 + 3 = 6
   # Redefine defaults - h should be re-evaluated
-  (e/run "(def default1 200)" :env env :send send :req req)
-  (e/run "(def default2 300)" :env env :send send :req req)
-  (e/run "(def result8 (h 1))" :env env :send send :req req)
+  (e/run "(def default1 200)" :env env :send send :req req :sess sess)
+  (e/run "(def default2 300)" :env env :send send :req req :sess sess)
+  (e/run "(def result8 (h 1))" :env env :send send :req req :sess sess)
   (is (= 501 (get-value env 'result8)))  # 1 + 200 + 300 = 501
   # Test 4: Variadic parameter shadowing a global
-  (e/run "(def rest 999)" :env env :send send :req req)
-  (e/run "(defn shadow-test [a & rest] (length rest))" :env env :send send :req req)
-  (e/run "(def result9 (shadow-test 1 2 3 4))" :env env :send send :req req)
+  (e/run "(def rest 999)" :env env :send send :req req :sess sess)
+  (e/run "(defn shadow-test [a & rest] (length rest))" :env env :send send :req req :sess sess)
+  (e/run "(def result9 (shadow-test 1 2 3 4))" :env env :send send :req req :sess sess)
   (is (= 3 (get-value env 'result9)))  # rest parameter has 3 items
   # Redefine global rest - shadow-test should NOT be re-evaluated
-  (e/run "(def rest 111)" :env env :send send :req req)
-  (e/run "(def result10 (shadow-test 1 2 3 4))" :env env :send send :req req)
+  (e/run "(def rest 111)" :env env :send send :req req :sess sess)
+  (e/run "(def result10 (shadow-test 1 2 3 4))" :env env :send send :req req :sess sess)
   (is (= 3 (get-value env 'result10)))  # Still 3, not affected by global
   # Test 5: &keys parameter
-  (e/run "(def key-default 42)" :env env :send send :req req)
-  (e/run "(defn with-keys [a &keys {:x x :y y}] (+ a (or x key-default) (or y key-default)))" :env env :send send :req req)
-  (e/run "(def result11 (with-keys 1 :x 10 :y 20))" :env env :send send :req req)
+  (e/run "(def key-default 42)" :env env :send send :req req :sess sess)
+  (e/run "(defn with-keys [a &keys {:x x :y y}] (+ a (or x key-default) (or y key-default)))" :env env :send send :req req :sess sess)
+  (e/run "(def result11 (with-keys 1 :x 10 :y 20))" :env env :send send :req req :sess sess)
   (is (= 31 (get-value env 'result11)))  # 1 + 10 + 20 = 31
-  (e/run "(def result12 (with-keys 1))" :env env :send send :req req)
+  (e/run "(def result12 (with-keys 1))" :env env :send send :req req :sess sess)
   (is (= 85 (get-value env 'result12)))  # 1 + 42 + 42 = 85
   # Redefine key-default - with-keys should be re-evaluated
-  (e/run "(def key-default 100)" :env env :send send :req req)
-  (e/run "(def result13 (with-keys 1))" :env env :send send :req req)
+  (e/run "(def key-default 100)" :env env :send send :req req :sess sess)
+  (e/run "(def result13 (with-keys 1))" :env env :send send :req req :sess sess)
   (is (= 201 (get-value env 'result13)))  # 1 + 100 + 100 = 201
   # Test 6: &named parameter
-  (e/run "(def named-default 7)" :env env :send send :req req)
-  (e/run "(defn with-named [a &named x y] (+ a (or x named-default) (or y named-default)))" :env env :send send :req req)
-  (e/run "(def result14 (with-named 1 :x 2 :y 3))" :env env :send send :req req)
+  (e/run "(def named-default 7)" :env env :send send :req req :sess sess)
+  (e/run "(defn with-named [a &named x y] (+ a (or x named-default) (or y named-default)))" :env env :send send :req req :sess sess)
+  (e/run "(def result14 (with-named 1 :x 2 :y 3))" :env env :send send :req req :sess sess)
   (is (= 6 (get-value env 'result14)))  # 1 + 2 + 3 = 6
-  (e/run "(def result15 (with-named 1))" :env env :send send :req req)
+  (e/run "(def result15 (with-named 1))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result15)))  # 1 + 7 + 7 = 15
   # Redefine named-default - with-named should be re-evaluated
-  (e/run "(def named-default 50)" :env env :send send :req req)
-  (e/run "(def result16 (with-named 1))" :env env :send send :req req)
+  (e/run "(def named-default 50)" :env env :send send :req req :sess sess)
+  (e/run "(def result16 (with-named 1))" :env env :send send :req req :sess sess)
   (is (= 101 (get-value env 'result16))))  # 1 + 50 + 50 = 101
 
 (deftest deps-nested-functions
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define global x
-  (e/run "(def x 10)" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
   # Define function that returns closure capturing x
-  (e/run "(defn outer [] (fn [] x))" :env env :send send :req req)
-  (e/run "(def inner (outer))" :env env :send send :req req)
-  (e/run "(def result1 (inner))" :env env :send send :req req)
+  (e/run "(defn outer [] (fn [] x))" :env env :send send :req req :sess sess)
+  (e/run "(def inner (outer))" :env env :send send :req req :sess sess)
+  (e/run "(def result1 (inner))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'result1)))
   # Redefine x - outer should be re-evaluated, which re-evaluates inner
-  (e/run "(def x 20)" :env env :send send :req req)
-  (e/run "(def inner2 (outer))" :env env :send send :req req)
-  (e/run "(def result2 (inner2))" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
+  (e/run "(def inner2 (outer))" :env env :send send :req req :sess sess)
+  (e/run "(def result2 (inner2))" :env env :send send :req req :sess sess)
   (is (= 20 (get-value env 'result2))))
 
 (deftest deps-destructuring
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test array destructuring
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y 20)" :env env :send send :req req)
-  (e/run "(def [a b] [x y])" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y 20)" :env env :send send :req req :sess sess)
+  (e/run "(def [a b] [x y])" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'a)))
   (is (= 20 (get-value env 'b)))
   # Redefine x, destructured bindings should update
   (buffer/clear outb)
-  (e/run "(def x 100)" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'a)))
   (is (= 20 (get-value env 'b)))
   # Test struct destructuring
-  (e/run "(def data {:foo 1 :bar 2})" :env env :send send :req req)
-  (e/run "(def {:foo f :bar b} data)" :env env :send send :req req)
+  (e/run "(def data {:foo 1 :bar 2})" :env env :send send :req req :sess sess)
+  (e/run "(def {:foo f :bar b} data)" :env env :send send :req req :sess sess)
   (is (= 1 (get-value env 'f)))
   (is (= 2 (get-value env 'b)))
   # Redefine data, destructured bindings should update
   (buffer/clear outb)
-  (e/run "(def data {:foo 10 :bar 20})" :env env :send send :req req)
+  (e/run "(def data {:foo 10 :bar 20})" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'f)))
   (is (= 20 (get-value env 'b))))
 
@@ -392,37 +406,39 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Test that loop bindings are scoped correctly (i should not be tracked as dependency)
-  (e/run "(def n 5)" :env env :send send :req req)
-  (e/run "(def total1 (do (var acc 0) (loop [i :range [0 n]] (+= acc i)) acc))" :env env :send send :req req)
+  (e/run "(def n 5)" :env env :send send :req req :sess sess)
+  (e/run "(def total1 (do (var acc 0) (loop [i :range [0 n]] (+= acc i)) acc))" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'total1)))  # 0+1+2+3+4 = 10
   # Redefine n, total1 should be re-evaluated with new range
   (buffer/clear outb)
-  (e/run "(def n 4)" :env env :send send :req req)
+  (e/run "(def n 4)" :env env :send send :req req :sess sess)
   (is (= 6 (get-value env 'total1)))
   # Test loop with :in modifier and external reference
-  (e/run "(def items [1 2 3])" :env env :send send :req req)
-  (e/run "(def multiplier 10)" :env env :send send :req req)
-  (e/run "(def total2 (do (var acc 0) (loop [item :in items] (+= acc (* item multiplier))) acc))" :env env :send send :req req)
+  (e/run "(def items [1 2 3])" :env env :send send :req req :sess sess)
+  (e/run "(def multiplier 10)" :env env :send send :req req :sess sess)
+  (e/run "(def total2 (do (var acc 0) (loop [item :in items] (+= acc (* item multiplier))) acc))" :env env :send send :req req :sess sess)
   (is (= 60 (get-value env 'total2)))  # (1+2+3) * 10 = 60
   # Redefine multiplier - total2 should be re-evaluated
   (buffer/clear outb)
-  (e/run "(def multiplier 5)" :env env :send send :req req)
+  (e/run "(def multiplier 5)" :env env :send send :req req :sess sess)
   (is (= 30 (get-value env 'total2))))  # (1+2+3) * 5 = 30
 
 (deftest deps-chained-dependencies
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Create chain a -> b -> c
-  (e/run "(def a 1)" :env env :send send :req req)
-  (e/run "(def b (+ a 1))" :env env :send send :req req)
-  (e/run "(def c (+ b 1))" :env env :send send :req req)
+  (e/run "(def a 1)" :env env :send send :req req :sess sess)
+  (e/run "(def b (+ a 1))" :env env :send send :req req :sess sess)
+  (e/run "(def c (+ b 1))" :env env :send send :req req :sess sess)
   (is (= 1 (get-value env 'a)))
   (is (= 2 (get-value env 'b)))
   (is (= 3 (get-value env 'c)))
   # Redefine a, both b and c should update
-  (e/run "(def a 10)" :env env :send send :req req)
+  (e/run "(def a 10)" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'a)))
   (is (= 11 (get-value env 'b)))
   (is (= 12 (get-value env 'c))))
@@ -431,58 +447,62 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define variable and function that uses it
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(defn f [] (+ x 5))" :env env :send send :req req)
-  (e/run "(def result1 (f))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(defn f [] (+ x 5))" :env env :send send :req req :sess sess)
+  (e/run "(def result1 (f))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'result1)))
   # Redefine x, function should be recompiled
-  (e/run "(def x 20)" :env env :send send :req req)
-  (e/run "(def result2 (f))" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
+  (e/run "(def result2 (f))" :env env :send send :req req :sess sess)
   (is (= 25 (get-value env 'result2))))
 
 (deftest deps-transitive-through-function
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define a -> g (function) -> b (calls g)
-  (e/run "(def a 5)" :env env :send send :req req)
-  (e/run "(defn g [] (+ a 10))" :env env :send send :req req)
-  (e/run "(def b (g))" :env env :send send :req req)
+  (e/run "(def a 5)" :env env :send send :req req :sess sess)
+  (e/run "(defn g [] (+ a 10))" :env env :send send :req req :sess sess)
+  (e/run "(def b (g))" :env env :send send :req req :sess sess)
   (is (= 15 (get-value env 'b)))
   # Redefine a, both g and b should update
-  (e/run "(def a 100)" :env env :send send :req req)
+  (e/run "(def a 100)" :env env :send send :req req :sess sess)
   (is (= 110 (get-value env 'b))))
 
 (deftest deps-multiple-dependencies
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # z depends on both x and y
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y 20)" :env env :send send :req req)
-  (e/run "(def z (+ x y))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y 20)" :env env :send send :req req :sess sess)
+  (e/run "(def z (+ x y))" :env env :send send :req req :sess sess)
   (is (= 30 (get-value env 'z)))
   # Redefine x, z should update
-  (e/run "(def x 100)" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
   (is (= 120 (get-value env 'z)))
   # Redefine y, z should update again
-  (e/run "(def y 5)" :env env :send send :req req)
+  (e/run "(def y 5)" :env env :send send :req req :sess sess)
   (is (= 105 (get-value env 'z))))
 
 (deftest deps-multiple-dependents
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Both c and d depend on a and b
-  (e/run "(def a 1)" :env env :send send :req req)
-  (e/run "(def b 2)" :env env :send send :req req)
-  (e/run "(def c (+ a b))" :env env :send send :req req)
-  (e/run "(def d (* a b))" :env env :send send :req req)
+  (e/run "(def a 1)" :env env :send send :req req :sess sess)
+  (e/run "(def b 2)" :env env :send send :req req :sess sess)
+  (e/run "(def c (+ a b))" :env env :send send :req req :sess sess)
+  (e/run "(def d (* a b))" :env env :send send :req req :sess sess)
   (is (= 3 (get-value env 'c)))
   (is (= 2 (get-value env 'd)))
   # Redefine a, both c and d should update
-  (e/run "(def a 10)" :env env :send send :req req)
+  (e/run "(def a 10)" :env env :send send :req req :sess sess)
   (is (= 12 (get-value env 'c)))
   (is (= 20 (get-value env 'd))))
 
@@ -490,17 +510,18 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Create diamond: a depends on b and c, both b and c depend on d
-  (e/run "(def d 5)" :env env :send send :req req)
-  (e/run "(def b (+ d 10))" :env env :send send :req req)
-  (e/run "(def c (+ d 20))" :env env :send send :req req)
-  (e/run "(def a (+ b c))" :env env :send send :req req)
+  (e/run "(def d 5)" :env env :send send :req req :sess sess)
+  (e/run "(def b (+ d 10))" :env env :send send :req req :sess sess)
+  (e/run "(def c (+ d 20))" :env env :send send :req req :sess sess)
+  (e/run "(def a (+ b c))" :env env :send send :req req :sess sess)
   (is (= 5 (get-value env 'd)))
   (is (= 15 (get-value env 'b)))
   (is (= 25 (get-value env 'c)))
   (is (= 40 (get-value env 'a)))
   # Redefine d - b and c should update, then a should update once with both new values
-  (e/run "(def d 100)" :env env :send send :req req)
+  (e/run "(def d 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'd)))
   (is (= 110 (get-value env 'b)))
   (is (= 120 (get-value env 'c)))
@@ -510,15 +531,16 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Create circular dependency a <-> b
-  (e/run "(def a 10)" :env env :send send :req req)
-  (e/run "(def b a)" :env env :send send :req req)
+  (e/run "(def a 10)" :env env :send send :req req :sess sess)
+  (e/run "(def b a)" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'b)))
   # Close the loop
-  (e/run "(def a b)" :env env :send send :req req)
+  (e/run "(def a b)" :env env :send send :req req :sess sess)
   (is (= 10 (get-value env 'a)))
   # Redefine b, should not infinite loop
-  (e/run "(def b 100)" :env env :send send :req req)
+  (e/run "(def b 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'b)))
   (is (= 100 (get-value env 'a))))
 
@@ -526,15 +548,16 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Create cycle x -> y -> z -> x
-  (e/run "(def x 1)" :env env :send send :req req)
-  (e/run "(def y 2)" :env env :send send :req req)
-  (e/run "(def z 3)" :env env :send send :req req)
-  (e/run "(def x y)" :env env :send send :req req)
-  (e/run "(def y z)" :env env :send send :req req)
-  (e/run "(def z x)" :env env :send send :req req)
+  (e/run "(def x 1)" :env env :send send :req req :sess sess)
+  (e/run "(def y 2)" :env env :send send :req req :sess sess)
+  (e/run "(def z 3)" :env env :send send :req req :sess sess)
+  (e/run "(def x y)" :env env :send send :req req :sess sess)
+  (e/run "(def y z)" :env env :send send :req req :sess sess)
+  (e/run "(def z x)" :env env :send send :req req :sess sess)
   # Redefine any, should not infinite loop
-  (e/run "(def x 100)" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
   (is (= 100 (get-value env 'x)))
   (is (= 100 (get-value env 'y)))
   (is (= 100 (get-value env 'z))))
@@ -545,14 +568,15 @@
   (def send (make-sender outb))
   (def env (e/eval-make-env))
   (def path (dyn :current-file))
+  (def sess (make-sess))
   # Define x as a function, y calls it, z uses it
-  (e/run "(def x +)" :env env :send send :req req)
-  (e/run "(def y (x 1 2))" :env env :send send :req req)
-  (e/run "(def z (+ x 100))" :env env :send send :req req)
+  (e/run "(def x +)" :env env :send send :req req :sess sess)
+  (e/run "(def y (x 1 2))" :env env :send send :req req :sess sess)
+  (e/run "(def z (+ x 100))" :env env :send send :req req :sess sess)
   (is (= 3 (get-value env 'y)))
   # Redefine x to a symbol (will cause errors in re-evaluation)
   (buffer/clear outb)
-  (e/run "(def x 'not-a-function)" :env env :send send :req req)
+  (e/run "(def x 'not-a-function)" :env env :send send :req req :sess sess)
   # y should keep old value (re-eval failed)
   (is (= 3 (get-value env 'y)))
   # Check exact error messages
@@ -599,12 +623,13 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Define dependencies
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y (+ x 5))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y (+ x 5))" :env env :send send :req req :sess sess)
   # Redefine x and check for note message
   (buffer/clear outb)
-  (e/run "(def x 20)" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def messages @[])
   (while (parser/has-more p)
@@ -653,23 +678,24 @@
   (def outb @"")
   (def send (make-sender outb))
   (def env (e/eval-make-env))
+  (def sess (make-sess))
   # Build up a dependency graph with chained dependencies
-  (e/run "(def x 10)" :env env :send send :req req)
-  (e/run "(def y (+ x 5))" :env env :send send :req req)
-  (e/run "(def z (+ y 10))" :env env :send send :req req)
+  (e/run "(def x 10)" :env env :send send :req req :sess sess)
+  (e/run "(def y (+ x 5))" :env env :send send :req req :sess sess)
+  (e/run "(def z (+ y 10))" :env env :send send :req req :sess sess)
   # Verify initial values
   (is (= 10 (get-value env 'x)))
   (is (= 15 (get-value env 'y)))
   (is (= 25 (get-value env 'z)))
   # Clear the graph (simulating what happens at the start of env-load)
-  (when-let [graph (get env :grapple/dep-graph)]
+  (when-let [graph (get-in sess [:dep-graph u/ns])]
     (deps/clear-graph graph))
   # Re-evaluate all definitions as if loading a file from scratch
   # This should NOT trigger any cascade re-evaluation messages
   (buffer/clear outb)
-  (e/run "(def x 20)" :env env :send send :req req)
-  (e/run "(def y (+ x 5))" :env env :send send :req req)
-  (e/run "(def z (+ y 10))" :env env :send send :req req)
+  (e/run "(def x 20)" :env env :send send :req req :sess sess)
+  (e/run "(def y (+ x 5))" :env env :send send :req req :sess sess)
+  (e/run "(def z (+ y 10))" :env env :send send :req req :sess sess)
   # Parse messages to verify no cascade occurred
   (parser/consume p outb)
   (def messages @[])
@@ -691,7 +717,7 @@
   # Now verify the graph was rebuilt correctly by checking that
   # subsequent changes DO trigger cascades
   (buffer/clear outb)
-  (e/run "(def x 100)" :env env :send send :req req)
+  (e/run "(def x 100)" :env env :send send :req req :sess sess)
   # Parse messages
   (parser/consume p outb)
   (def messages2 @[])
