@@ -3,8 +3,15 @@ local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_.autoload
 local log = autoload("grapple.client.log")
 local n = autoload("conjure.nfnl.core")
+local state = autoload("grapple.client.state")
 local function sess_new(conn, opts)
-  return conn.send({op = "sess.new"}, opts)
+  local token = state.get("token")
+  local msg = {op = "sess.new"}
+  if token then
+    n.assoc(msg, "auth", token)
+  else
+  end
+  return conn.send(msg, opts)
 end
 local function sess_end(conn, opts)
   return conn.send({op = "sess.end"}, opts)

@@ -44,6 +44,13 @@
 # Handle functions
 
 (defn sess-new [req sns send-ret send-err]
+  # Check if authentication is required
+  (when (def expected-token (sns :token))
+    (def provided-token (req "auth"))
+    (unless (= expected-token provided-token)
+      (send-err "authentication failed")
+      (break)))
+  # Create session as normal
   (def sess (make-sess sns))
   (unless sess
     (send-err "failed to start session")

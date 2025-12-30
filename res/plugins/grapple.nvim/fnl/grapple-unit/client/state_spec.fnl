@@ -85,4 +85,22 @@
         (n.assoc (state.get) :conn nil)
         ;; Other key should remain
         (assert.is_nil (state.get :conn))
-        (assert.equals 99999 (state.get :server-pid))))))
+        (assert.equals 99999 (state.get :server-pid))))
+
+    (it "has token field initialized to nil"
+      (fn []
+        ;; Token should be a valid key in initial state
+        (let [initial (state.get)]
+          ;; Token should exist as a key (even if nil)
+          (assert.is_nil initial.token))))
+
+    (it "can store and retrieve authentication token"
+      (fn []
+        ;; Set a token
+        (n.assoc (state.get) :token "abc123token")
+        ;; Retrieve it
+        (let [token (state.get :token)]
+          (assert.equals "abc123token" token))
+        ;; Clear it
+        (n.assoc (state.get) :token nil)
+        (assert.is_nil (state.get :token))))))

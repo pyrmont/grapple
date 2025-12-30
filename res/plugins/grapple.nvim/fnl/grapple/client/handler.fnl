@@ -108,6 +108,14 @@
   (when msg
    (let [action (or (and opts opts.action) nil)]
      (if
+      ; Check for authentication errors first (special case)
+      (and (error-msg? msg)
+           (= "sess.new" msg.op)
+           (string.find (or msg.val "") "authentication failed")
+           opts.on-auth-error)
+      (opts.on-auth-error)
+
+      ; Regular error handling
       (error-msg? msg)
       (display-error msg.val msg)
 

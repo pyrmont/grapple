@@ -69,6 +69,21 @@ local function _2_()
     assert.is_nil(state.get("conn"))
     return assert.equals(99999, state.get("server-pid"))
   end
-  return it("maintains separate keys independently", _11_)
+  it("maintains separate keys independently", _11_)
+  local function _12_()
+    local initial = state.get()
+    return assert.is_nil(initial.token)
+  end
+  it("has token field initialized to nil", _12_)
+  local function _13_()
+    n.assoc(state.get(), "token", "abc123token")
+    do
+      local token = state.get("token")
+      assert.equals("abc123token", token)
+    end
+    n.assoc(state.get(), "token", nil)
+    return assert.is_nil(state.get("token"))
+  end
+  return it("can store and retrieve authentication token", _13_)
 end
 return describe("get", _2_)

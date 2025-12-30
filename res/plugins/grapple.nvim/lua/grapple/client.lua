@@ -23,6 +23,38 @@ local function process_alive_3f(job_id)
   local result = vim.fn.jobwait({job_id}, 0)
   return (-1 == result[1])
 end
+local function generate_token()
+  local f = io.open("/dev/urandom", "rb")
+  local bytes = f:read(16)
+  local _ = f:close()
+  local hex_chars = "0123456789abcdef"
+  local token
+  local function _3_(acc, byte)
+    local b = string.byte(byte)
+    local high = bit.rshift(b, 4)
+    local low = bit.band(b, 15)
+    return (acc .. string.sub(hex_chars, (high + 1), (high + 1)) .. string.sub(hex_chars, (low + 1), (low + 1)))
+  end
+  token = n.reduce(_3_, "", vim.split(bytes, "", true))
+  return token
+end
+local function wait_for_server_ready(on_ready, on_timeout)
+  local function poll(attempt)
+    if state.get("server-ready") then
+      return on_ready()
+    else
+      if (attempt < 50) then
+        local function _4_()
+          return poll((attempt + 1))
+        end
+        return vim.defer_fn(_4_, 100)
+      else
+        return on_timeout()
+      end
+    end
+  end
+  return poll(0)
+end
 local function start_server(opts)
   local buf = log.buf()
   local existing_pid = state.get("server-pid")
@@ -32,27 +64,31 @@ local function start_server(opts)
     local host = (opts.host or config["get-in"]({"client", "janet", "mrepl", "connection", "default_host"}))
     local initial_port = (opts.port or config["get-in"]({"client", "janet", "mrepl", "connection", "default_port"}))
     local max_attempts = 5
+    local token = generate_token()
     local grapple_path = (vim.env.GRAPPLE_PATH or vim.fn.exepath("grapple"))
     local base_cmd = vim.split(grapple_path, " ")
+    n.assoc(state.get(), "token", token)
+    n.assoc(state.get(), "server-ready", false)
     log.append("info", {("Starting server on port " .. initial_port .. "...")})
     local function try_port(attempt, current_port)
       if (attempt >= max_attempts) then
         return log.append("error", {("Failed to start server after " .. max_attempts .. " attempts")})
       else
-        local full_cmd = vim.list_extend(vim.fn.copy(base_cmd), {"--host", host, "--port", tostring(current_port)})
+        local full_cmd = vim.list_extend(vim.fn.copy(base_cmd), {"--host", host, "--port", tostring(current_port), "--token", token})
         local job_id = vim.fn.jobstart(full_cmd)
         n.assoc(state.get(), "server-pid", job_id)
         n.assoc(state.get(), "server-port", tostring(current_port))
-        local function _3_()
+        local function _7_()
           if process_alive_3f(job_id) then
-            return log.append("info", {("Server started successfully on port " .. current_port)})
+            log.append("info", {("Server started successfully on port " .. current_port)})
+            return n.assoc(state.get(), "server-ready", true)
           else
             n.assoc(state.get(), "server-pid", nil)
             log.append("info", {("Port " .. current_port .. " unavailable, trying " .. (current_port + 1) .. "...")})
             return try_port((attempt + 1), (current_port + 1))
           end
         end
-        return vim.defer_fn(_3_, 1000)
+        return vim.defer_fn(_7_, 1000)
       end
     end
     return try_port(0, tonumber(initial_port))
@@ -89,13 +125,13 @@ local function display_conn_status(status)
   end
 end
 local function disconnect()
-  local function _11_(conn)
+  local function _15_(conn)
     request["sess-end"](conn, nil)
     conn.destroy()
     n.assoc(state.get(), "conn", nil)
     return log.append("info", {"Disconnected from server"})
   end
-  return with_conn_or_warn(_11_)
+  return with_conn_or_warn(_15_)
 end
 local function stop_server()
   local buf = log.buf()
@@ -107,6 +143,7 @@ local function stop_server()
     end
     vim.fn.jobstop(pid)
     n.assoc(state.get(), "server-pid", nil)
+    n.assoc(state.get(), "token", nil)
     return log.append("info", {"Server stopped"})
   else
     return log.append("info", {"No server running"})
@@ -130,66 +167,93 @@ local function connect(opts)
   else
   end
   local conn
-  local function _16_(err)
+  local function _20_(err)
     if (auto_start_3f and not opts0["retry?"]) then
       start_server(opts0)
-      local function _17_()
+      local function _21_()
         return connect(n.assoc(opts0, "retry?", true))
       end
-      return vim.defer_fn(_17_, 1000)
+      local function _22_()
+        return log.append("error", {"Server failed to start in time"})
+      end
+      return wait_for_server_ready(_21_, _22_)
     else
       return display_conn_status(err)
     end
   end
-  local function _19_()
+  local function _24_()
     n.assoc(state.get(), "conn", conn)
     display_conn_status("connected")
-    return request["sess-new"](conn, opts0)
+    local function _25_()
+      n.assoc(state.get(), "token", nil)
+      do
+        local old_conn = state.get("conn")
+        if old_conn then
+          old_conn.destroy()
+          n.assoc(state.get(), "conn", nil)
+        else
+        end
+      end
+      if (auto_start_3f and not opts0["retry?"]) then
+        log.append("info", {"Authentication failed, starting new server..."})
+        start_server(n.assoc(opts0, "port", tostring((tonumber(port) + 1))))
+        local function _27_()
+          return connect(n.assoc(opts0, "retry?", true))
+        end
+        local function _28_()
+          return log.append("error", {"Server failed to start in time"})
+        end
+        return wait_for_server_ready(_27_, _28_)
+      else
+        return log.append("error", {"Authentication failed"})
+      end
+    end
+    return request["sess-new"](conn, n.assoc(opts0, "on-auth-error", _25_))
   end
-  local function _20_(err)
+  local function _30_(err)
     if err then
       return display_conn_status(err)
     else
       return disconnect()
     end
   end
-  conn = remote.connect({host = host, port = port, lang = lang, ["on-message"] = handler["handle-message"], ["on-failure"] = _16_, ["on-success"] = _19_, ["on-error"] = _20_})
+  conn = remote.connect({host = host, port = port, lang = lang, ["on-message"] = handler["handle-message"], ["on-failure"] = _20_, ["on-success"] = _24_, ["on-error"] = _30_})
   return nil
 end
 local function eval_str(opts)
-  local function _22_(conn)
+  local function _32_(conn)
     return request["env-eval"](conn, opts)
   end
-  return with_conn_or_warn(_22_, opts)
+  return with_conn_or_warn(_32_, opts)
 end
 local function eval_file(opts)
-  local function _23_(conn)
+  local function _33_(conn)
     return request["env-load"](conn, opts)
   end
-  return with_conn_or_warn(_23_, opts)
+  return with_conn_or_warn(_33_, opts)
 end
 local function doc_str(opts)
-  local function _24_(conn)
+  local function _34_(conn)
     return request["env-doc"](conn, opts)
   end
-  return with_conn_or_warn(_24_, opts)
+  return with_conn_or_warn(_34_, opts)
 end
 local function def_str(opts)
-  local function _25_(conn)
+  local function _35_(conn)
     return request["env-doc"](conn, opts)
   end
-  return with_conn_or_warn(_25_, opts)
+  return with_conn_or_warn(_35_, opts)
 end
 local function on_filetype()
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _26_()
+  local function _36_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _26_, {desc = "Connect to a REPL"})
-  local function _27_()
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _36_, {desc = "Connect to a REPL"})
+  local function _37_()
     return start_server({})
   end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _27_, {desc = "Start the Grapple server"})
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _37_, {desc = "Start the Grapple server"})
   return mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
 end
 local function on_load()
@@ -207,10 +271,10 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _29_(result)
+    local function _39_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _29_)
+    return n.assoc(opts, "on-result", _39_)
   else
     return opts
   end

@@ -1,10 +1,14 @@
 (local {: autoload} (require :conjure.nfnl.module))
 (local log (autoload :grapple.client.log))
 (local n (autoload :conjure.nfnl.core))
+(local state (autoload :grapple.client.state))
 
 (fn sess-new [conn opts]
-  (conn.send {:op "sess.new"}
-             opts))
+  (let [token (state.get :token)
+        msg {:op "sess.new"}]
+    (when token
+      (n.assoc msg :auth token))
+    (conn.send msg opts)))
 
 (fn sess-end [conn opts]
   (conn.send {:op "sess.end"}

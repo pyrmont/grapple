@@ -28,6 +28,49 @@
               opts {:action (fn [] "test-action")}]
           (request.sess-new conn opts)
           (assert.equals "sess.new" sent-msg.op)
+          (assert.equals opts sent-opts))))
+
+    (it "sends sess.new message with auth token when token in state"
+      (fn []
+        ;; First require state module
+        (local state (require :grapple.client.state))
+        (local n (require :conjure.nfnl.core))
+
+        ;; Set a token in state
+        (n.assoc (state.get) :token "test-token-abc123")
+
+        (var sent-msg nil)
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
+                            (set sent-msg msg)
+                            (set sent-opts opts))}
+              opts {:action (fn [] "test-action")}]
+          (request.sess-new conn opts)
+          (assert.equals "sess.new" sent-msg.op)
+          (assert.equals "test-token-abc123" sent-msg.auth)
+          (assert.equals opts sent-opts))
+
+        ;; Clean up: clear the token
+        (n.assoc (state.get) :token nil)))
+
+    (it "sends sess.new message without auth when no token in state"
+      (fn []
+        ;; First require state module
+        (local state (require :grapple.client.state))
+        (local n (require :conjure.nfnl.core))
+
+        ;; Ensure no token in state
+        (n.assoc (state.get) :token nil)
+
+        (var sent-msg nil)
+        (var sent-opts nil)
+        (let [conn {:send (fn [msg opts]
+                            (set sent-msg msg)
+                            (set sent-opts opts))}
+              opts {:action (fn [] "test-action")}]
+          (request.sess-new conn opts)
+          (assert.equals "sess.new" sent-msg.op)
+          (assert.is_nil sent-msg.auth)
           (assert.equals opts sent-opts))))))
 
 (describe "sess-end"

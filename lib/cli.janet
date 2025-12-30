@@ -13,6 +13,9 @@
                             :short   "p"
                             :default 3737
                             :help    "TCP port to bind to as the host."}
+           "--token"       {:kind    :single
+                            :short   "t"
+                            :help    "Authentication token for client connections."}
            "--logging"     {:kind    :single
                             :short   "l"
                             :proxy   "level"
@@ -40,6 +43,7 @@
     # default
     (server/start :host (opts "host")
                   :port (opts "port")
+                  :token (opts "token")
                   :log-level (opts "logging"))))
 
 # for testing in development

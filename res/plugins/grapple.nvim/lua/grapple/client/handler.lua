@@ -108,7 +108,9 @@ end
 local function handle_message(msg, opts)
   if msg then
     local action = ((opts and opts.action) or nil)
-    if error_msg_3f(msg) then
+    if (error_msg_3f(msg) and ("sess.new" == msg.op) and string.find((msg.val or ""), "authentication failed") and opts["on-auth-error"]) then
+      return opts["on-auth-error"]()
+    elseif error_msg_3f(msg) then
       return display_error(msg.val, msg)
     elseif ("sess.new" == msg.op) then
       return handle_sess_new(msg)

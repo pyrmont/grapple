@@ -57,6 +57,97 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
+(deftest sess-new-with-auth-no-token-required
+  (setup)
+  (def [recv send chan] (make-stream))
+  # Server has no token set, so auth is not required
+  (h/handle {"op" "sess.new"
+             "lang" u/lang
+             "id" "1"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "sess.new"
+               "lang" u/lang
+               "req" "1"
+               "sess" "2"
+               "done" true
+               "janet/arch" (os/arch)
+               "janet/impl" ["janet" janet/version]
+               "janet/os" (os/which)
+               "janet/prot" u/prot
+               "janet/serv" u/proj})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
+(deftest sess-new-with-auth-token-required-no-auth-provided
+  (setup)
+  (def [recv send chan] (make-stream))
+  # Server has token set, so auth is required
+  (put sessions :token "test-token-123")
+  (h/handle {"op" "sess.new"
+             "lang" u/lang
+             "id" "1"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "err"
+               "op" "sess.new"
+               "lang" u/lang
+               "req" "1"
+               "sess" nil
+               "val" "authentication failed"})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
+(deftest sess-new-with-auth-token-required-wrong-auth
+  (setup)
+  (def [recv send chan] (make-stream))
+  # Server has token set, client provides wrong token
+  (put sessions :token "test-token-123")
+  (h/handle {"op" "sess.new"
+             "lang" u/lang
+             "id" "1"
+             "auth" "wrong-token"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "err"
+               "op" "sess.new"
+               "lang" u/lang
+               "req" "1"
+               "sess" nil
+               "val" "authentication failed"})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
+(deftest sess-new-with-auth-token-required-correct-auth
+  (setup)
+  (def [recv send chan] (make-stream))
+  # Server has token set, client provides correct token
+  (put sessions :token "test-token-123")
+  (h/handle {"op" "sess.new"
+             "lang" u/lang
+             "id" "1"
+             "auth" "test-token-123"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "sess.new"
+               "lang" u/lang
+               "req" "1"
+               "sess" "2"
+               "done" true
+               "janet/arch" (os/arch)
+               "janet/impl" ["janet" janet/version]
+               "janet/os" (os/which)
+               "janet/prot" u/prot
+               "janet/serv" u/proj})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
 (deftest sess-end
   (setup)
   (def [recv send chan] (make-stream))

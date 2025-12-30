@@ -6,6 +6,8 @@
     (fn []
       {:conn nil
        :server-pid nil
-       :server-port nil})))
+       :server-port nil
+       :token nil
+       :server-ready false})))
 
 {: get}

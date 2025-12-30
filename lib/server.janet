@@ -18,14 +18,16 @@
       (h/handle req sessions send))
     (u/log "Connection closed")))
 
-(defn start [&named host port handler log-level]
-  (def sessions @{:count 0 :clients @{}})
+(defn start [&named host port handler log-level token]
+  (def sessions @{:count 0 :clients @{} :token token})
   (default host default-host)
   (default port default-port)
   (default log-level :normal)
   (default handler (make-default-handler sessions log-level))
   (setdyn :grapple/log-level log-level)
   (u/log (string "Server starting at " host " on port " port "..."))
+  (when token
+    (u/log "Authentication required for connections" :debug))
   (def server (net/listen host port :stream true))
   (ev/go
     (fn :server []
