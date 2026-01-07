@@ -143,8 +143,9 @@
         (put names sym true))))
   names)
 
-(defn- extract-deps [form &opt initial-locals]
+(defn- extract-deps [form &opt initial-locals is-macro?]
   (default initial-locals {})
+  (default is-macro? false)
   # first expand all macros
   (def expanded (macro-expand form))
   # collect all def/var/fn bindings in the expanded form (these are local to this expression)
@@ -178,26 +179,63 @@
   (collect-bindings expanded)
   # now collect all symbol references that aren't local or in root-env
   (def deps @{})
-  (defn collect-deps [x]
-    (case (type x)
-      :symbol
-      (let [sym x]
-        (unless (or (in local-bindings sym)
-                    (in root-env sym)
-                    (in special-forms sym))
-          (put deps sym true)))
-      :tuple
-      (each item x (collect-deps item))
-      :array
-      (each item x (collect-deps item))
-      :struct # TODO: Do you need to do this for k?
-      (eachp [k v] x (collect-deps k) (collect-deps v))
-      :table # TODO: Do you need to do this for k?
-      (eachp [k v] x (collect-deps k) (collect-deps v))))
+  (var collect-deps nil)
+  (var collect-from-qq nil)
+  # Helper to collect deps from within quasiquoted forms
+  (set collect-from-qq
+    (fn [form]
+      (case (type form)
+        :symbol
+        # for macros, symbols in quasiquotes (even without unquote) are dependencies
+        # because they'll be evaluated in the calling context
+        (when is-macro?
+          (unless (or (in local-bindings form)
+                      (in root-env form)
+                      (in special-forms form))
+            (put deps form true)))
+        :tuple
+        (let [h (get form 0)]
+          (if (= h 'unquote)
+            # unquoted expression - collect deps normally
+            (collect-deps (get form 1))
+            # not unquoted - recurse to find nested unquotes/symbols
+            (each item form (collect-from-qq item))))
+        :array
+        (each item form (collect-from-qq item))
+        :struct
+        (eachp [k v] form (collect-from-qq k) (collect-from-qq v))
+        :table
+        (eachp [k v] form (collect-from-qq k) (collect-from-qq v)))))
+  (set collect-deps
+    (fn [x]
+      (case (type x)
+        :symbol
+        (let [sym x]
+          (unless (or (in local-bindings sym)
+                      (in root-env sym)
+                      (in special-forms sym))
+            (put deps sym true)))
+        :tuple
+        (let [head (get x 0)]
+          (cond
+            # quoted forms have no dependencies
+            (= head 'quote)
+            nil
+            # quasiquoted forms only depend on unquoted expressions
+            (= head 'quasiquote)
+            (collect-from-qq (get x 1))
+            # normal tuple - collect from all items
+            (each item x (collect-deps item))))
+        :array
+        (each item x (collect-deps item))
+        :struct
+        (eachp [k v] x (collect-deps k) (collect-deps v))
+        :table
+        (eachp [k v] x (collect-deps k) (collect-deps v)))))
   (collect-deps expanded)
   (keys deps))
 
-(defn- find-transitive-dependents [graph sym &opt visited]
+(defn- find-trans-depnts [graph sym &opt visited]
   (default visited @{})
   # avoid cycles
   (when (in visited sym)
@@ -206,34 +244,74 @@
   (def direct-deps (get-in graph [:dependents sym] @[]))
   (def all-deps @[])
   (each dep direct-deps
-    (array/push all-deps dep)
-    (array/concat all-deps (find-transitive-dependents graph dep visited)))
+    # Don't include a symbol that's already been visited (prevents cycles and self-reference)
+    (unless (in visited dep)
+      (array/push all-deps dep)
+      (array/concat all-deps (find-trans-depnts graph dep visited))))
   all-deps)
 
-(defn- topological-sort [graph syms]
-  (def sym-set @{})
-  (each s syms (put sym-set s true))
-  # count dependencies within the set for each symbol
-  (defn dep-count [sym]
-    (def deps (get-in graph [:deps sym] @[]))
-    (length (filter (partial in sym-set) deps)))
-  # get line number for a symbol, defaulting to infinity if unavailable
-  (defn line-number [sym]
-    (get-in graph [:sources sym :line] math/inf))
-  # sort by dependency count first, then by line number
-  (sorted syms (fn [a b]
-                 (def count-a (dep-count a))
-                 (def count-b (dep-count b))
-                 (if (= count-a count-b)
-                   # secondary sort: by line number
-                   (< (line-number a) (line-number b))
-                   # primary sort: by dependency count
-                   (< count-a count-b)))))
+(defn- kahn-sort [nodes deps-fn depnts-fn sess]
+  (defn key-fn [[path sym]]
+    (string path ":" sym))
+  (defn comp-fn [[p1 s1] [p2 s2]]
+    (if (= p1 p2)
+      (do
+        (def graph (get-in sess [:dep-graph p1]))
+        (< (get-in graph [:sources s1 :line] math/inf)
+           (get-in graph [:sources s2 :line] math/inf)))
+      (< p1 p2)))
+  # Build set for quick lookup
+  (def node-set @{})
+  (each node nodes
+    (put node-set (key-fn node) node))
+  # Count how many dependencies of each node are also in the affected set
+  (def pending @{})
+  (each node nodes
+    (def key (key-fn node))
+    (def deps (deps-fn node))
+    (def affected-deps (filter (fn [dep] (in node-set (key-fn dep))) deps))
+    (put pending key (length affected-deps)))
+  # Find all nodes with no pending dependencies
+  (def ready @[])
+  (each node nodes
+    (def key (key-fn node))
+    (when (= (get pending key) 0)
+      (array/push ready node)))
+  (sort ready comp-fn)
+  # Process nodes using index-based FIFO queue
+  (def result @[])
+  (var queue-idx 0)
+  (while (< queue-idx (length ready))
+    (def node (in ready queue-idx))
+    (++ queue-idx)
+    (def key (key-fn node))
+    (array/push result node)
+    # Collect newly ready nodes
+    (def newly-ready @[])
+    # Decrement pending for dependents
+    (def dependents (depnts-fn node))
+    (each dep dependents
+      (def dep-key (key-fn dep))
+      (when (in node-set dep-key)
+        (def new-count (- (get pending dep-key) 1))
+        (put pending dep-key new-count)
+        (when (= new-count 0)
+          (array/push newly-ready dep))))
+    # Add newly ready nodes in sorted order
+    (unless (empty? newly-ready)
+      (sort newly-ready comp-fn)
+      (array/concat ready newly-ready)))
+  # Check for cycles
+  (when (not= (length result) (length nodes))
+    (def unprocessed (filter (fn [node] (> (get pending (key-fn node)) 0)) nodes))
+    (def msg (string "cross-file dependency cycle detected: "
+                     (string/join (map (fn [[p s]] (string p ":" s)) unprocessed) ", ")))
+    (error msg))
+  result)
 
 # Dependency graph management
 
 (defn clear-graph
-  "Clears all entries in a dependency graph, resetting it to empty state"
   [graph &named keep-imports?]
   (put graph :deps @{})
   (put graph :dependents @{})
@@ -242,7 +320,6 @@
     (put graph :importers @{})))
 
 (defn extract-pattern-symbols
-  "Extracts all symbols from a destructuring pattern"
   [pattern]
   (def symbols @[])
   (defn walk [p]
@@ -255,19 +332,87 @@
   (walk pattern)
   symbols)
 
+(defn topological-sort
+  ```
+  Sorts symbols topologically across multiple files using Kahn's algorithm.
+
+  Takes an array of [path sym] pairs and a session object, returns them in
+  dependency order (dependencies before dependents), sorted alphabetically
+  by file path and line number for stable ordering.
+  ```
+  [affected sess]
+  # Helper to get line number for a symbol
+  (defn get-line [path sym]
+    (def graph (get-in sess [:dep-graph path]))
+    (get-in graph [:sources sym :line] math/inf))
+  # Helper to get all dependencies of a [path sym] node
+  (defn get-deps [[path sym]]
+    (def graph (get-in sess [:dep-graph path]))
+    (def local-deps (get-in graph [:deps sym] @[]))
+    (def all-deps @[])
+    # Add local dependencies (same file)
+    (each dep local-deps
+      (array/push all-deps [path dep]))
+    # Add cross-file dependencies
+    (def env (module/cache path))
+    (when env
+      (each dep local-deps
+        (def binding (get env dep))
+        (when binding
+          (def source-map (get binding :source-map))
+          # If source is from another file, track it
+          (when (and (tuple? source-map) (not= (get source-map 0) path))
+            (def dep-path (get source-map 0))
+            (def source-env (module/cache dep-path))
+            (when source-env
+              # Find the original symbol in the source file
+              (eachp [source-sym source-binding] source-env
+                (when (= (get source-binding :source-map) source-map)
+                  (array/push all-deps [dep-path source-sym])
+                  (break))))))))
+    all-deps)
+  # Helper to get all dependents of a [path sym] node
+  (defn get-depnts [[path sym]]
+    (def graph (get-in sess [:dep-graph path]))
+    (def all-deps @[])
+    # Add local dependents (same file)
+    (def local-depnts (get-in graph [:dependents sym] @[]))
+    (each dep local-depnts
+      (array/push all-deps [path dep]))
+    # Add cross-file dependents
+    (def importers (get-in graph [:importers sym] @[]))
+    (each {:file other-path :as imported-sym} importers
+      (def other-graph (get-in sess [:dep-graph other-path]))
+      (when other-graph
+        (def other-depnts (get-in other-graph [:dependents imported-sym] @[]))
+        (each other-dep other-depnts
+          (array/push all-deps [other-path other-dep]))))
+    all-deps)
+  (kahn-sort affected get-deps get-depnts sess))
+
 (defn get-reeval-order
-  "Gets the list of symbols to re-evaluate when sym is redefined, in order"
-  [graph sym]
-  # find all transitive dependents
-  (def all-dependents (find-transitive-dependents graph sym))
-  (when (empty? all-dependents)
+  ```
+  Gets the list of symbols to re-evaluate when sym is redefined, in order.
+
+  Takes path, sym, and sess to use unified topological sorting.
+  ```
+  [path sym sess]
+  (def graph (get-in sess [:dep-graph path]))
+  (unless graph
     (break @[]))
-  # remove duplicates and sort in dependency order
-  (def unique-deps (distinct all-dependents))
-  (topological-sort graph unique-deps))
+  # find all trans dependents
+  (def all-depnts (find-trans-depnts graph sym))
+  (when (empty? all-depnts)
+    (break @[]))
+  # remove duplicates and convert to [path sym] pairs
+  (def unique-deps (distinct all-depnts))
+  (def node-pairs (map (fn [s] [path s]) unique-deps))
+  # use unified topological sort
+  (def sorted-pairs (topological-sort node-pairs sess))
+  # extract just the symbols
+  (map (fn [[p s]] s) sorted-pairs))
 
 (defn make-dep-graph
-  "Creates a new dependency graph"
   []
   @{:deps @{}        # sym -> [dependencies]
     :dependents @{}  # sym -> [symbols that depend on this]
@@ -275,7 +420,6 @@
     :importers @{}}) # sym -> [{:file path :as imported-sym}]
 
 (defn track-definition
-  "Tracks dependencies for a definition form and updates the graph"
   [graph source env path sess]
   # no source value so return early
   (unless (and (tuple? source) (> (length source) 1))
@@ -302,7 +446,7 @@
                     (tuple 'fn ;(slice source 2))
                     # for def/var, analyze the value
                     (in source 2)))
-  (def dep-list (extract-deps value-expr))
+  (def dep-list (extract-deps value-expr {} (= head 'defmacro)))
   # for each symbol in the pattern, track dependencies
   (each sym syms
     # store dependencies: sym -> [dependencies]
@@ -313,10 +457,12 @@
     # update reverse index and check for cross-file dependencies
     (each dep dep-list
       # update reverse index: for each dependency, add sym to its dependents
-      (def dependents (get-in graph [:dependents dep] @[]))
-      (unless (find (partial = sym) dependents)
-        (array/push dependents sym))
-      (put-in graph [:dependents dep] dependents)
+      # but don't add a symbol to its own dependents list
+      (unless (= sym dep)
+        (def dependents (get-in graph [:dependents dep] @[]))
+        (unless (find (partial = sym) dependents)
+          (array/push dependents sym))
+        (put-in graph [:dependents dep] dependents))
       # look up the dependency in the environment
       (when (def binding (get env dep))
         # check if it has a source map from a different file

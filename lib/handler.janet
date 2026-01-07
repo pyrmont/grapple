@@ -15,7 +15,12 @@
    "env.load" {:req ["lang" "id" "sess" "path"]}
    "env.stop" {:req ["lang" "id" "sess" "req"]}
    "env.doc" {:req ["lang" "id" "sess" "sym" "ns"]}
-   "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}})
+   "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}
+   "dbg.brk.add" {:req ["lang" "id" "sess" "path" "line"]}
+   "dbg.brk.rem" {:req ["lang" "id" "sess" "path" "line"]}
+   "dbg.brk.clr" {:req ["lang" "id" "sess"]}
+   "dbg.step.cont" {:req ["lang" "id" "sess"]}
+   "dbg.insp.stk" {:req ["lang" "id" "sess"]}})
 
 (defn confirm [req ks send-err]
   (each k ks
@@ -38,7 +43,8 @@
   (def count (inc (sessions :count)))
   (put sessions :count count)
   (def sess-id (string count))
-  (put (sessions :clients) sess-id @{:dep-graph @{}})
+  (put (sessions :clients) sess-id @{:dep-graph @{}
+                                     :breakpoints @{}})
   sess-id)
 
 # Handle functions
@@ -96,14 +102,25 @@
   (when (and line col)
     (parser/where parser line col))
   (def sess (get-in sns [:clients sess-id]))
-  (def res (eval/run code
-                     :env eval-env
-                     :parser parser
-                     :path ns
-                     :send send
-                     :req req
-                     :sess sess))
-  (send-ret res))
+  # Run evaluation in a fiber to allow yielding on breakpoints
+  (def eval-fiber
+    (fiber/new
+      (fn []
+        (eval/run code
+                  :env eval-env
+                  :parser parser
+                  :path ns
+                  :send send
+                  :req req
+                  :sess sess))
+      :d))
+  (def res (resume eval-fiber))
+  # Check if fiber is in debug state (store state if it is)
+  (if (= :debug (fiber/status eval-fiber))
+    (put sess :paused {:fiber eval-fiber
+                       :req req
+                       :send send})
+    (send-ret res)))
 
 (defn env-load [req sns send-ret send-err send]
   (def {"path" path "sess" sess-id} req)
@@ -126,8 +143,7 @@
                      :req req
                      :sess sess))
   # Trigger cross-file re-evaluation after reload
-  (def send-note (util/make-send-note req send))
-  (eval/cross-reeval path sess send-note)
+  (eval/cross-reeval path sess req send)
   (send-ret res))
 
 (defn env-doc [req sns send-ret send-err]
@@ -175,6 +191,91 @@
       (set t (table/getproto t))))
   (send-ret (sort matches)))
 
+(defn dbg-brk-add [req sns send-ret send-err]
+  (def {"path" path
+        "line" line
+        "col" col
+        "sess" sess-id} req)
+  (def sess (get-in sns [:clients sess-id]))
+  (unless sess
+    (send-err "invalid session")
+    (break))
+  (def column (or col 1))
+  (debug/break path line column)
+  (def bp-key (string path ":" line))
+  (put-in sess [:breakpoints bp-key] {:path path :line line :col column})
+  (send-ret nil {"janet/bp" bp-key}))
+
+(defn dbg-brk-rem [req sns send-ret send-err]
+  (def {"path" path
+        "line" line
+        "sess" sess-id} req)
+  (def sess (get-in sns [:clients sess-id]))
+  (unless sess
+    (send-err "invalid session")
+    (break))
+  (def bp-key (string path ":" line))
+  (def column (get-in sess [:breakpoints bp-key :col] 1))
+  (debug/unbreak path line column)
+  (put-in sess [:breakpoints bp-key] nil)
+  (send-ret nil {"janet/bp" bp-key}))
+
+(defn dbg-brk-clr [req sns send-ret send-err]
+  (def {"sess" sess-id} req)
+  (def sess (get-in sns [:clients sess-id]))
+  (unless sess
+    (send-err "invalid session")
+    (break))
+  # Clear all breakpoints for this session
+  (def breakpoints (sess :breakpoints))
+  (each bp breakpoints
+    (debug/unbreak (bp :path) (bp :line) (bp :col)))
+  (table/clear breakpoints)
+  (send-ret nil))
+
+(defn dbg-step-cont [req sns send-ret send-err]
+  (def {"sess" sess-id} req)
+  (def sess (get-in sns [:clients sess-id]))
+  (unless sess
+    (send-err "invalid session")
+    (break))
+  (def paused (sess :paused))
+  (unless (and paused (paused :fiber))
+    (send-err "no paused fiber")
+    (break))
+  # Get original request context
+  (def orig-req (paused :req))
+  (def orig-send (paused :send))
+  (def orig-ret (util/make-send-ret orig-req orig-send))
+  (def orig-err (util/make-send-err orig-req orig-send))
+  # Resume paused fiber
+  (def result (resume (paused :fiber) :continue))
+  (def status (fiber/status (paused :fiber)))
+  (unless (= status :debug)
+    (put sess :paused nil))
+  # Handle based on fiber status
+  (case status
+    :dead
+    (orig-ret result)
+    :debug
+    nil
+    (orig-err (string "fiber status: " status)))
+  (send-ret nil))
+
+(defn dbg-insp-stk [req sns send-ret send-err]
+  (def {"sess" sess-id} req)
+  (def sess (get-in sns [:clients sess-id]))
+  (unless sess
+    (send-err "invalid session")
+    (break))
+  (def paused (sess :paused))
+  (unless (and paused (paused :fiber))
+    (send-err "no paused fiber")
+    (break))
+  # Resume paused fiber
+  (def frame-data (resume (paused :fiber) :stack))
+  (send-ret (string/format "%q" frame-data)))
+
 (defn handle [req sns send]
   (def send-ret (util/make-send-ret req send))
   (def send-err (util/make-send-err req send))
@@ -201,7 +302,12 @@
         "env.load" (env-load req sns send-ret send-err send)
         "env.stop" (send-err "operation not implemented")
         "env.doc" (env-doc req sns send-ret send-err)
-        "env.cmpl" (env-cmpl req sns send-ret send-err))
+        "env.cmpl" (env-cmpl req sns send-ret send-err)
+        "dbg.brk.add" (dbg-brk-add req sns send-ret send-err)
+        "dbg.brk.rem" (dbg-brk-rem req sns send-ret send-err)
+        "dbg.brk.clr" (dbg-brk-clr req sns send-ret send-err)
+        "dbg.step.cont" (dbg-step-cont req sns send-ret send-err)
+        "dbg.insp.stk" (dbg-insp-stk req sns send-ret send-err))
       # return value
       true)
     ([e f]

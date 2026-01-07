@@ -5,9 +5,12 @@
 (def default-host "127.0.0.1")
 (def default-port 3737)
 
+(defn- check-port [s]
+  (-> (net/localname s) (get 1)))
+
 (defn- make-default-handler [sessions log-level]
   (fn :handler [conn]
-    (setdyn :grapple/log-level log-level)
+    (u/set-log-level log-level)
     (u/log "Connection opened")
     (def recv (t/make-recv conn))
     (def f (ev/to-file conn))
@@ -24,11 +27,12 @@
   (default port default-port)
   (default log-level :normal)
   (default handler (make-default-handler sessions log-level))
-  (setdyn :grapple/log-level log-level)
-  (u/log (string "Server starting at " host " on port " port "..."))
+  (u/set-log-level log-level)
   (when token
     (u/log "Authentication required for connections" :debug))
   (def server (net/listen host port :stream true))
+  (def used-port (if (zero? port) (check-port server) port))
+  (u/log (string "Server started at " host " on port " used-port "..."))
   (ev/go
     (fn :server []
       (try

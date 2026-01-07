@@ -8,6 +8,7 @@
 (local request (autoload :grapple.client.request))
 (local state (autoload :grapple.client.state))
 (local ts (autoload :conjure.tree-sitter))
+(local ui (autoload :grapple.client.ui))
 
 (local buf-suffix ".janet")
 (local comment-prefix "# ")
@@ -31,16 +32,19 @@
        {:mapping {:connect "cc"
                   :disconnect "cd"
                   :start-server "cs"
-                  :stop-server "cS"}}}}}))
+                  :stop-server "cS"
+                  :add-breakpoint "dba"
+                  :remove-breakpoint "dbr"
+                  :clear-breakpoints "dbc"
+                  :continue "dsc"
+                  :inspect-stack "dis"}}}}}))
 
 (fn process-alive? [job-id]
-  "Check if a job is still running"
   (let [result (vim.fn.jobwait [job-id] 0)]
     ; jobwait returns [-1] if job is still running, [exit-code] if done
     (= -1 (. result 1))))
 
 (fn generate-token []
-  "Generate a cryptographically random token using /dev/urandom"
   (let [f (io.open "/dev/urandom" "rb")
         bytes (f:read 16)  ; 16 bytes = 128 bits
         _ (f:close)
@@ -58,7 +62,6 @@
     token))
 
 (fn wait-for-server-ready [on-ready on-timeout]
-  "Poll until server is ready, then call on-ready. Calls on-timeout if max attempts exceeded."
   (fn poll [attempt]
     (if (state.get :server-ready)
       (on-ready)
@@ -253,7 +256,65 @@
       (request.env-doc conn opts))
     opts))
 
+(fn add-breakpoint []
+  (with-conn-or-warn
+    (fn [conn]
+      (let [bufnr (vim.api.nvim_get_current_buf)
+            file-path (vim.api.nvim_buf_get_name bufnr)
+            cursor (vim.api.nvim_win_get_cursor 0)
+            line (. cursor 1)
+            col (. cursor 2)]
+        (request.dbg-brk-add conn {:file-path file-path
+                                   :line line
+                                   :col (+ col 1)
+                                   :bufnr bufnr})))
+    {}))
+
+(fn continue-execution []
+  (with-conn-or-warn
+    (fn [conn]
+      (request.dbg-step-cont conn {}))
+    {}))
+
+(fn inspect-stack []
+  (with-conn-or-warn
+    (fn [conn]
+      (request.dbg-insp-stk conn {}))
+    {}))
+
+
+(fn remove-breakpoint []
+  (with-conn-or-warn
+    (fn [conn]
+      (let [bufnr (vim.api.nvim_get_current_buf)
+            file-path (vim.api.nvim_buf_get_name bufnr)
+            cursor (vim.api.nvim_win_get_cursor 0)
+            line (. cursor 1)]
+        (request.dbg-brk-rem conn {:file-path file-path
+                                    :line line})))
+    {}))
+
+(fn clear-breakpoints []
+  (with-conn-or-warn
+    (fn [conn]
+      (request.dbg-brk-clr conn {}))
+    {}))
+
+
 (fn on-filetype []
+  ; Initialize breakpoint signs
+  (ui.init-breakpoint-signs)
+  ; Initialize debug position sign
+  (ui.init-debug-sign)
+  ; Set up autocmd to clear breakpoints on buffer write
+  ; This prevents breakpoints from being at wrong locations after edits
+  (vim.api.nvim_create_autocmd "BufWritePost"
+    {:buffer 0
+     :callback (fn []
+                 (when (connected?)
+                   (clear-breakpoints))
+                 nil)
+     :desc "Clear all breakpoints after buffer write"})
   (mapping.buf
     :JanetDisconnect
     (config.get-in [:client :janet :mrepl :mapping :disconnect])
@@ -273,7 +334,32 @@
     :JanetStop
     (config.get-in [:client :janet :mrepl :mapping :stop-server])
     stop-server
-    {:desc "Stop the Grapple server"}))
+    {:desc "Stop the Grapple server"})
+  (mapping.buf
+    :JanetAddBreakpoint
+    (config.get-in [:client :janet :mrepl :mapping :add-breakpoint])
+    add-breakpoint
+    {:desc "Add a breakpoint at the cursor"})
+  (mapping.buf
+    :JanetRemoveBreakpoint
+    (config.get-in [:client :janet :mrepl :mapping :remove-breakpoint])
+    remove-breakpoint
+    {:desc "Remove a breakpoint at the cursor"})
+  (mapping.buf
+    :JanetClearBreakpoints
+    (config.get-in [:client :janet :mrepl :mapping :clear-breakpoints])
+    clear-breakpoints
+    {:desc "Clear all breakpoints"})
+  (mapping.buf
+    :JanetContinue
+    (config.get-in [:client :janet :mrepl :mapping :continue])
+    continue-execution
+    {:desc "Continue execution from breakpoint"})
+  (mapping.buf
+    :JanetInspectStack
+    (config.get-in [:client :janet :mrepl :mapping :inspect-stack])
+    inspect-stack
+    {:desc "Inspect the current stack"}))
 
 (fn on-load []
   ; Auto-connect disabled - use <localleader>cc to connect manually
@@ -309,4 +395,9 @@
  : modify-client-exec-fn-opts
  : on-exit
  : on-filetype
- : on-load}
+ : on-load
+ : add-breakpoint
+ : remove-breakpoint
+ : continue-execution
+ : inspect-stack
+ : clear-breakpoints}

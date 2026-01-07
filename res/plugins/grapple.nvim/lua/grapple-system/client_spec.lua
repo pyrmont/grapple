@@ -112,9 +112,82 @@ local function _3_()
 end
 describe("client system tests", _3_)
 local function _20_()
+  local test_buf = nil
   local function _21_()
-    return assert.is_true(true)
+    test_buf = setup_client_context()
+    n.assoc(state.get(), "breakpoints", {})
+    return n.assoc(state.get(), "debug-position", nil)
   end
-  return it("connection tests can be added once server tests pass", _21_)
+  before_each(_21_)
+  local function _22_()
+    n.assoc(state.get(), "breakpoints", {})
+    n.assoc(state.get(), "debug-position", nil)
+    if test_buf then
+      return pcall(vim.api.nvim_buf_delete, test_buf, {force = true})
+    else
+      return nil
+    end
+  end
+  after_each(_22_)
+  local function _24_()
+    local breakpoints = state.get("breakpoints")
+    assert.is_not_nil(breakpoints)
+    return assert.is_table(breakpoints)
+  end
+  it("has breakpoints state initialized", _24_)
+  local function _25_()
+    local breakpoints = state.get("breakpoints")
+    local test_file = "/tmp/test.janet"
+    local line = 10
+    local bp_key = (test_file .. ":" .. line)
+    n.assoc(breakpoints, bp_key, {bufnr = test_buf, line = line, ["sign-id"] = 1001})
+    local stored_bp = breakpoints[bp_key]
+    assert.is_not_nil(stored_bp)
+    assert.equals(test_buf, stored_bp.bufnr)
+    assert.equals(line, stored_bp.line)
+    return assert.equals(1001, stored_bp["sign-id"])
+  end
+  it("can store breakpoint data in state", _25_)
+  local function _26_()
+    local breakpoints = state.get("breakpoints")
+    local test_file = "/tmp/test.janet"
+    local bp_key = (test_file .. ":10")
+    n.assoc(breakpoints, bp_key, {bufnr = test_buf, line = 10, ["sign-id"] = 1001})
+    assert.is_not_nil(breakpoints[bp_key])
+    n.assoc(breakpoints, bp_key, nil)
+    return assert.is_nil(breakpoints[bp_key])
+  end
+  it("can remove breakpoint data from state", _26_)
+  local function _27_()
+    local breakpoints = state.get("breakpoints")
+    n.assoc(breakpoints, "/tmp/test1.janet:10", {bufnr = test_buf, line = 10, ["sign-id"] = 1001})
+    n.assoc(breakpoints, "/tmp/test2.janet:20", {bufnr = test_buf, line = 20, ["sign-id"] = 1002})
+    assert.equals(2, #vim.tbl_keys(breakpoints))
+    n.assoc(state.get(), "breakpoints", {})
+    local cleared_breakpoints = state.get("breakpoints")
+    return assert.equals(0, #vim.tbl_keys(cleared_breakpoints))
+  end
+  it("can clear all breakpoints from state", _27_)
+  local function _28_()
+    local debug_pos = {path = "/tmp/test.janet", line = 15, col = 3}
+    n.assoc(state.get(), "debug-position", debug_pos)
+    local stored_pos = state.get("debug-position")
+    assert.is_not_nil(stored_pos)
+    assert.equals("/tmp/test.janet", stored_pos.path)
+    assert.equals(15, stored_pos.line)
+    return assert.equals(3, stored_pos.col)
+  end
+  it("can store and retrieve debug position", _28_)
+  local function _29_()
+    local function _30_()
+      client["add-breakpoint"]()
+      client["remove-breakpoint"]()
+      client["clear-breakpoints"]()
+      client["continue-execution"]()
+      return client["inspect-stack"]()
+    end
+    return assert.has_no.errors(_30_)
+  end
+  return it("breakpoint commands don't crash when not connected", _29_)
 end
-return describe("client connection tests (optional)", _20_)
+return describe("client debugging infrastructure", _20_)

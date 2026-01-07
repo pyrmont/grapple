@@ -4,16 +4,20 @@
 (def ns "<mrepl>")
 
 (def- log-levels {:off 0 :normal 1 :debug 2})
+(var- log-level :normal)
+
+(defn set-log-level [level]
+  (set log-level level))
 
 (defn log [msg &opt level io]
   (default level :normal)
-  (def log-level (log-levels (dyn :grapple/log-level)))
-  (when log-level
-    (def msg-level (log-levels level))
+  (def log-index (log-levels log-level))
+  (when log-index
+    (def msg-index (log-levels level))
     (def s (if (string? msg) msg (string/format "%q" msg)))
-    (when (>= log-level msg-level)
+    (when (>= log-index msg-index)
       (def prefix
-        (when (= log-level 2)
+        (when (= log-index 2)
           (case io
             :in
             "[DBG] (in) "
@@ -77,6 +81,23 @@
                 "req" id
                 "sess" sess
                 "done" true
+                "val" val})
+    (send (cond
+            (nil? details)
+            resp
+            (dictionary? details)
+            (merge-into resp details)
+            # default
+            (error "invalid argument: must be nil or dictionary")))))
+
+(defn make-send-sig [req send]
+  (def {"op" op "id" id "sess" sess} req)
+  (fn :sig-sender [val &opt details]
+    (def resp @{"tag" "sig"
+                "op" op
+                "lang" lang
+                "req" id
+                "sess" sess
                 "val" val})
     (send (cond
             (nil? details)

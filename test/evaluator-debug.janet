@@ -1,0 +1,314 @@
+(use ../deps/testament)
+
+(import ../lib/utilities :as u)
+(import ../lib/evaluator :as e)
+
+# Utility Functions
+
+(defn make-sender [b]
+  (fn :send [v]
+    # use buffer becuase ev/give doesn't work in janet_call
+    (buffer/push b (string/format "%q" v))))
+
+# Helper to run eval in fiber (matching handler behavior)
+(defn run-eval [code & args]
+  (def fib (fiber/new (fn [] (e/run code ;args)) :dey))
+  (def res (resume fib))
+  [res fib])
+
+# Generic eval request
+
+(def req
+  {"op" "env.eval"
+   "lang" u/lang
+   "id" "1"
+   "sess" "1"})
+
+# Debug tests
+
+(deftest debug-breakpoint-pause
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def sess @{:dep-graph @{}})
+  (def test-path "test-breakpoint.janet")
+  # First compile the function definition
+  (def [res1 fib1] (run-eval "(defn test-fn [x]\n  (def y (+ x 5))\n  y)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Now set a breakpoint at line 2 (after function is compiled)
+  (buffer/clear outb)
+  (debug/break test-path 2 3)
+  # Run code that calls the function in a fiber (hits the breakpoint)
+  (def [res2 fib2] (run-eval "(test-fn 10)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Verify it paused at the breakpoint
+  (is (= :debug (fiber/status fib2)))
+  # Parse and verify the signal message
+  (parser/consume p outb)
+  (def expect-sig {"tag" "sig"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "val" "debug"
+                   "janet/path" test-path
+                   "janet/line" 2
+                   "janet/col" 3})
+  (def actual-sig (parser/produce p))
+  (is (== expect-sig actual-sig))
+  # Continue execution
+  (buffer/clear outb)
+  (def final-res (resume fib2 :continue))
+  (is (= :dead (fiber/status fib2)))
+  # Parse and verify the return message
+  (parser/consume p outb)
+  (def expect-ret {"tag" "ret"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "done" false
+                   "val" "15"
+                   "janet/path" test-path
+                   "janet/line" 1
+                   "janet/col" 1
+                   "janet/reeval?" false})
+  (def actual-ret (parser/produce p))
+  (is (== expect-ret actual-ret))
+  (is (not (parser/has-more p)))
+  # Clean up
+  (debug/unbreak test-path 2 3))
+
+(deftest debug-breakpoint-continue
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def sess @{:dep-graph @{}})
+  (def test-path "test-continue.janet")
+  # First compile the function
+  (def [res1 fib1] (run-eval "(defn calc [x]\n  (def sum (+ x 5))\n  sum)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Set a breakpoint
+  (buffer/clear outb)
+  (debug/break test-path 2 3)
+  # Run code that calls the function in a fiber
+  (def [res2 fib2] (run-eval "(calc 10)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Verify we're paused at a breakpoint
+  (is (= :debug (fiber/status fib2)))
+  # Parse and verify the signal message
+  (parser/consume p outb)
+  (def expect-sig {"tag" "sig"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "val" "debug"
+                   "janet/path" test-path
+                   "janet/line" 2
+                   "janet/col" 3})
+  (def actual-sig (parser/produce p))
+  (is (== expect-sig actual-sig))
+  # Continue execution
+  (buffer/clear outb)
+  (resume fib2 :continue)
+  (is (= :dead (fiber/status fib2)))
+  # Parse and verify the return message
+  (parser/consume p outb)
+  (def expect-ret {"tag" "ret"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "done" false
+                   "val" "15"
+                   "janet/path" test-path
+                   "janet/line" 1
+                   "janet/col" 1
+                   "janet/reeval?" false})
+  (def actual-ret (parser/produce p))
+  (is (== expect-ret actual-ret))
+  (is (not (parser/has-more p)))
+  # Clean up
+  (debug/unbreak test-path 2 3))
+
+(deftest debug-breakpoint-inspect-stack
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def sess @{:dep-graph @{}})
+  (def test-path "test-inspect.janet")
+  # First compile the function
+  (def [res1 fib1]
+    (run-eval "(defn compute [a b]\n  (def result (+ a b))\n  result)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Set a breakpoint
+  (buffer/clear outb)
+  (debug/break test-path 2 3)
+  # Run code that calls the function in a fiber
+  (def [res2 fib2] (run-eval "(compute 5 7)"
+         :env env :send send :req req :path test-path :sess sess))
+  # Verify we're paused at a breakpoint
+  (is (= :debug (fiber/status fib2)))
+  # Parse and verify the signal message
+  (parser/consume p outb)
+  (def expect-sig {"tag" "sig"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "val" "debug"
+                   "janet/path" test-path
+                   "janet/line" 2
+                   "janet/col" 3})
+  (def actual-sig (parser/produce p))
+  (is (== expect-sig actual-sig))
+  # Request stack inspection
+  (def frames (resume fib2 :stack))
+  (is (not (nil? frames)))
+  (is (> (length frames) 0))
+  # First frame should have the function name and locals
+  (def top-frame (first frames))
+  (is (= "compute" (top-frame :name)))
+  (is (= test-path (top-frame :path)))
+  (is (= 2 (top-frame :line)))
+  # Should have local variables a and b
+  (def locals (top-frame :locals))
+  (is (= 5 (locals 'a)))
+  (is (= 7 (locals 'b)))
+  # Continue to complete
+  (buffer/clear outb)
+  (resume fib2 :continue)
+  (is (= :dead (fiber/status fib2)))
+  # Parse and verify the return message
+  (parser/consume p outb)
+  (def expect-ret {"tag" "ret"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "done" false
+                   "val" "12"
+                   "janet/path" test-path
+                   "janet/line" 1
+                   "janet/col" 1
+                   "janet/reeval?" false})
+  (def actual-ret (parser/produce p))
+  (is (== expect-ret actual-ret))
+  (is (not (parser/has-more p)))
+  # Clean up
+  (debug/unbreak test-path 2 3))
+
+(deftest debug-no-breakpoint-normal-execution
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def sess @{:dep-graph @{}})
+  (def test-path "test-normal.janet")
+  # Run code without any breakpoints
+  (def code "(def x 10)\n(def y (+ x 5))\ny")
+  (run-eval code :env env :send send :req req :path test-path :sess sess)
+  # Parse and verify all messages
+  (parser/consume p outb)
+  (def expect-1 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "10"
+                 "janet/path" test-path
+                 "janet/line" 1
+                 "janet/col" 1
+                 "janet/reeval?" false})
+  (def actual-1 (parser/produce p))
+  (is (== expect-1 actual-1))
+  (def expect-2 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "15"
+                 "janet/path" test-path
+                 "janet/line" 2
+                 "janet/col" 1
+                 "janet/reeval?" false})
+  (def actual-2 (parser/produce p))
+  (is (== expect-2 actual-2))
+  (def expect-3 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "15"
+                 "janet/path" test-path
+                 "janet/line" 3
+                 "janet/col" 1
+                 "janet/reeval?" false})
+  (def actual-3 (parser/produce p))
+  (is (== expect-3 actual-3))
+  (is (not (parser/has-more p))))
+
+(deftest debug-breakpoint-with-dependencies
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def sess @{:dep-graph @{}})
+  (def test-path "test-deps-debug.janet")
+  # Set up dependencies
+  (run-eval "(def x 10)" :env env :send send :req req :path test-path :sess sess)
+  (run-eval "(def y (+ x 5))" :env env :send send :req req :path test-path :sess sess)
+  # Set breakpoint on redefinition line
+  (buffer/clear outb)
+  (debug/break test-path 1 1)
+  # Redefine x which should trigger reevaluation
+  (def [res fib] (run-eval "(def x 20)" :env env :send send :req req :path test-path :sess sess))
+  # Parse and verify messages
+  (parser/consume p outb)
+  # First message should be the redefinition of x
+  (def expect-1 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "20"
+                 "janet/path" test-path
+                 "janet/line" 1
+                 "janet/col" 1
+                 "janet/reeval?" false})
+  (def actual-1 (parser/produce p))
+  (is (== expect-1 actual-1))
+  # Second message should be a note about re-evaluating dependents
+  (def expect-2 {"tag" "note"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "val" "Re-evaluating dependents of x: y"})
+  (def actual-2 (parser/produce p))
+  (is (== expect-2 actual-2))
+  # Third message should be the reevaluation of y
+  (def expect-3 {"tag" "ret"
+                 "op" "env.eval"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" false
+                 "val" "25"
+                 "janet/path" test-path
+                 "janet/reeval?" true})
+  (def actual-3 (parser/produce p))
+  (is (== expect-3 actual-3))
+  (is (not (parser/has-more p)))
+  # Clean up
+  (debug/unbreak test-path 1 1))
+
+(run-tests!)

@@ -8,6 +8,9 @@
        :server-pid nil
        :server-port nil
        :token nil
-       :server-ready false})))
+       :server-ready false
+       :breakpoints {}
+       :debug-position nil
+       :original-signcol-hl nil})))
 
 {: get}

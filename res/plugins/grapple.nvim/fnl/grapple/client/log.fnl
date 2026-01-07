@@ -12,6 +12,7 @@
 (local result-header "====== result ======")
 (local stdout-header "====== stdout ======")
 (local stderr-header "====== stderr ======")
+(local debug-header  "====== debug =======")
 
 ; Namespace for extmarks
 (local ns (vim.api.nvim_create_namespace "grapple-log"))
@@ -38,6 +39,7 @@
                               :error  [error-header "ErrorMsg"]
                               :input  [input-header nil]
                               :note   [note-header "Special"]
+                              :debug  [debug-header "DiagnosticWarn"]
                               :stdout [stdout-header "String"]
                               :stderr [stderr-header "WarningMsg"]
                               _       [result-header nil])]

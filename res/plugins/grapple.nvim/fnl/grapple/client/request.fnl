@@ -58,6 +58,36 @@
               :sym opts.code}
              opts))
 
+(fn dbg-brk-add [conn opts]
+  ; (log.append :debug [(.. "Setting breakpoint at " opts.file-path ":" opts.line)])
+  (conn.send {:op "dbg.brk.add"
+              :path opts.file-path
+              :line opts.line
+              :col (or opts.col 1)}
+             opts))
+
+(fn dbg-brk-rem [conn opts]
+  ; (log.append :debug [(.. "Removing breakpoint at " opts.file-path ":" opts.line)])
+  (conn.send {:op "dbg.brk.rem"
+              :path opts.file-path
+              :line opts.line}
+             opts))
+
+(fn dbg-brk-clr [conn opts]
+  ; (log.append :debug ["Clearing all breakpoints..."])
+  (conn.send {:op "dbg.brk.clr"}
+             opts))
+
+(fn dbg-step-cont [conn opts]
+  (log.append :debug ["Continuing execution..."])
+  (conn.send {:op "dbg.step.cont"}
+             opts))
+
+(fn dbg-insp-stk [conn opts]
+  (log.append :debug ["Inspecting stack..."])
+  (conn.send {:op "dbg.insp.stk"}
+             opts))
+
 {: sess-new
  : sess-end
  : sess-list
@@ -68,4 +98,9 @@
  : env-load
  : env-stop
  : env-doc
- : env-cmpl}
+ : env-cmpl
+ : dbg-brk-add
+ : dbg-brk-rem
+ : dbg-brk-clr
+ : dbg-step-cont
+ : dbg-insp-stk}

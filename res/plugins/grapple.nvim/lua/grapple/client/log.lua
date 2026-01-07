@@ -13,6 +13,7 @@ local note_header = "======= note ======="
 local result_header = "====== result ======"
 local stdout_header = "====== stdout ======"
 local stderr_header = "====== stderr ======"
+local debug_header = "====== debug ======="
 local ns = vim.api.nvim_create_namespace("grapple-log")
 local function highlight_lines(buf, start, _end, hl_group)
   return vim.api.nvim_buf_set_extmark(buf, ns, start, 0, {end_row = _end, hl_group = hl_group, priority = 200})
@@ -36,6 +37,8 @@ local function append(sec, lines, opts)
         return {input_header, nil}
       elseif (sec == "note") then
         return {note_header, "Special"}
+      elseif (sec == "debug") then
+        return {debug_header, "DiagnosticWarn"}
       elseif (sec == "stdout") then
         return {stdout_header, "String"}
       elseif (sec == "stderr") then

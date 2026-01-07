@@ -32,13 +32,16 @@
   (def p (parser/new))
   (parser/consume p "(def x 10)\n(def a (+ x 1))\n(def b (+ x 2))\n(def c (+ x 3))\n")
 
+  # Create a minimal session for the test
+  (def sess @{:dep-graph @{"test-file.janet" graph}})
+
   # Track all definitions
   (while (parser/has-more p)
     (def form (parser/produce p))
-    (deps/track-definition graph form nil nil nil))
+    (deps/track-definition graph form nil "test-file.janet" sess))
 
   # Get reevaluation order - should be sorted by line number
-  (def order (deps/get-reeval-order graph 'x))
+  (def order (deps/get-reeval-order "test-file.janet" 'x sess))
 
   # Verify order is by line number: a (line 2), b (line 3), c (line 4)
   (is (= 3 (length order)))

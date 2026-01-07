@@ -20,6 +20,7 @@
     (vim.wait 100 (fn [] false))
     buf))
 
+;; Basic example of system working
 (describe "client system tests"
   (fn []
     (var test-port "19999")
@@ -108,12 +109,101 @@
           (let [pid2 (state.get :server-pid)]
             (assert.is_not_nil pid2)))))))
 
-;; Note: Connection and evaluation tests are more complex and may require
-;; additional setup. Start with these basic server lifecycle tests.
-(describe "client connection tests (optional)"
+;; Debugging infrastructure tests
+;; Note: These tests verify the debug state management works correctly
+;; Full end-to-end debugging workflow (hitting breakpoints, pausing, continuing)
+;; requires a connected server and is better suited for manual/interactive testing
+(describe "client debugging infrastructure"
   (fn []
-    (it "connection tests can be added once server tests pass"
+    (var test-buf nil)
+
+    (before_each
       (fn []
-        ;; Once the basic server tests work, we can add connection tests
-        ;; that actually connect to the server and verify the connection state
-        (assert.is_true true)))))
+        ;; Set up Conjure client context
+        (set test-buf (setup-client-context))
+        ;; Initialize state
+        (n.assoc (state.get) :breakpoints {})
+        (n.assoc (state.get) :debug-position nil)))
+
+    (after_each
+      (fn []
+        ;; Clear state
+        (n.assoc (state.get) :breakpoints {})
+        (n.assoc (state.get) :debug-position nil)
+        ;; Delete test buffer
+        (when test-buf
+          (pcall vim.api.nvim_buf_delete test-buf {:force true}))))
+
+    (it "has breakpoints state initialized"
+      (fn []
+        ;; Breakpoints should exist in state
+        (let [breakpoints (state.get :breakpoints)]
+          (assert.is_not_nil breakpoints)
+          (assert.is_table breakpoints))))
+
+    (it "can store breakpoint data in state"
+      (fn []
+        ;; Manually store a breakpoint in state (simulating what add-breakpoint-sign does)
+        (let [breakpoints (state.get :breakpoints)
+              test-file "/tmp/test.janet"
+              line 10
+              bp-key (.. test-file ":" line)]
+          (n.assoc breakpoints bp-key {:bufnr test-buf :line line :sign-id 1001})
+          ;; Verify it was stored
+          (let [stored-bp (. breakpoints bp-key)]
+            (assert.is_not_nil stored-bp)
+            (assert.equals test-buf stored-bp.bufnr)
+            (assert.equals line stored-bp.line)
+            (assert.equals 1001 stored-bp.sign-id)))))
+
+    (it "can remove breakpoint data from state"
+      (fn []
+        ;; Add a breakpoint
+        (let [breakpoints (state.get :breakpoints)
+              test-file "/tmp/test.janet"
+              bp-key (.. test-file ":10")]
+          (n.assoc breakpoints bp-key {:bufnr test-buf :line 10 :sign-id 1001})
+          ;; Verify it exists
+          (assert.is_not_nil (. breakpoints bp-key))
+          ;; Remove it (simulating what remove-breakpoint does)
+          (n.assoc breakpoints bp-key nil)
+          ;; Verify it was removed
+          (assert.is_nil (. breakpoints bp-key)))))
+
+    (it "can clear all breakpoints from state"
+      (fn []
+        ;; Add multiple breakpoints
+        (let [breakpoints (state.get :breakpoints)]
+          (n.assoc breakpoints "/tmp/test1.janet:10" {:bufnr test-buf :line 10 :sign-id 1001})
+          (n.assoc breakpoints "/tmp/test2.janet:20" {:bufnr test-buf :line 20 :sign-id 1002})
+          ;; Verify they exist
+          (assert.equals 2 (length (vim.tbl_keys breakpoints)))
+          ;; Clear all (simulating what clear-all-breakpoints does)
+          (n.assoc (state.get) :breakpoints {})
+          ;; Verify all cleared
+          (let [cleared-breakpoints (state.get :breakpoints)]
+            (assert.equals 0 (length (vim.tbl_keys cleared-breakpoints)))))))
+
+    (it "can store and retrieve debug position"
+      (fn []
+        ;; Store debug position (simulating what show-debug-indicators does)
+        (let [debug-pos {:path "/tmp/test.janet" :line 15 :col 3}]
+          (n.assoc (state.get) :debug-position debug-pos)
+          ;; Retrieve it
+          (let [stored-pos (state.get :debug-position)]
+            (assert.is_not_nil stored-pos)
+            (assert.equals "/tmp/test.janet" stored-pos.path)
+            (assert.equals 15 stored-pos.line)
+            (assert.equals 3 stored-pos.col)))))
+
+    (it "breakpoint commands don't crash when not connected"
+      (fn []
+        ;; These should handle the disconnected case gracefully
+        ;; They will show warnings but shouldn't crash
+        (assert.has_no.errors
+          (fn []
+            (client.add-breakpoint)
+            (client.remove-breakpoint)
+            (client.clear-breakpoints)
+            (client.continue-execution)
+            (client.inspect-stack)))))))

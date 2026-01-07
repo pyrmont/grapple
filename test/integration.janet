@@ -9,19 +9,17 @@
 
 (var server nil)
 (var client nil)
-(def test-ports
-  {:server-up-down 50737
-   :client-connect 50738
-   :client-echo 50739
-   :client-complex 50740})
 
 # Teardown function
 
 (defn teardown []
-  (if client
-    (c/disconnect client))
-  (if server
-    (s/stop server)))
+  (when client
+    (c/disconnect client)
+    (set client nil))
+  (when server
+    (u/set-log-level :off)
+    (s/stop server)
+    (set server nil)))
 
 # Utility functions
 
@@ -37,24 +35,26 @@
 (deftest server-up-down
   (def actual-1 @"")
   (def actual-2 @"")
-  (def port (test-ports :server-up-down))
+  (var port nil)
   (with-dyns [:out actual-1
               :err actual-2]
-    (def server (s/start :port port :log-level :normal))
+    (def server (s/start :port 0 :log-level :normal))
+    (def [_ p] (net/localname server))
+    (set port p)
     (s/stop server))
-  (def expect-1 (string "Server starting at 127.0.0.1 on port " port "...\nServer stopping...\n"))
+  (def expect-1 (string "Server started at 127.0.0.1 on port " port "...\nServer stopping...\n"))
   (is (== expect-1 actual-1))
   (is (empty? actual-2))
   (teardown))
 
 (deftest client-connect
-  (def port (test-ports :client-connect))
   (defn handler [conn]
     (def [recv send] (make-streams conn))
     (def req (recv))
     (def {"id" req-id "sess" sess-id "op" op} req)
     (send {"tag" "ok"}))
-  (set server (s/start :port port :handler handler :log-level :none))
+  (set server (s/start :port 0 :handler handler :log-level :none))
+  (def [_ port] (net/localname server))
   (def [recv send conn] (c/connect :port port))
   (is (and recv send conn))
   (send {"lang" u/lang "id" "1"})
@@ -64,14 +64,14 @@
   (teardown))
 
 (deftest client-echo
-  (def port (test-ports :client-echo))
   (defn handler [conn]
     (def [recv send] (make-streams conn))
     (forever
       (def req (recv))
       (if (nil? req) (break))
       (send req)))
-  (set server (s/start :port port :handler handler :log-level :none))
+  (set server (s/start :port 0 :handler handler :log-level :none))
+  (def [_ port] (net/localname server))
   (def [recv send conn] (c/connect :port port))
   (is (and recv send conn))
   (set client conn)
@@ -83,7 +83,6 @@
   (teardown))
 
 (deftest client-complex
-  (def port (test-ports :client-complex))
   (def sessions @{:count 0 :clients @{}})
   (defn handler [conn]
     (def [recv _] (make-streams conn))
@@ -95,7 +94,8 @@
       (h/handle req sessions sendb)
       (:write conn buf)
       (buffer/clear buf)))
-  (set server (s/start :port port :handler handler :log-level :none))
+  (set server (s/start :port 0 :handler handler :log-level :none))
+  (def [_ port] (net/localname server))
   (def [recv send conn] (c/connect :port port))
   (is (and recv send conn))
   (set client conn)

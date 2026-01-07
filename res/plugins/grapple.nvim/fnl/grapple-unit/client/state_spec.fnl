@@ -103,4 +103,45 @@
           (assert.equals "abc123token" token))
         ;; Clear it
         (n.assoc (state.get) :token nil)
-        (assert.is_nil (state.get :token))))))
+        (assert.is_nil (state.get :token))))
+
+    (it "can store and retrieve breakpoints"
+      (fn []
+        ;; Set breakpoints for a file
+        (n.assoc (state.get) :breakpoints {"./test.janet" {10 "bp-key-1"
+                                                           20 "bp-key-2"}})
+        ;; Retrieve breakpoints
+        (let [bps (state.get :breakpoints)]
+          (assert.is_table bps)
+          (assert.equals "bp-key-1" (. (. bps "./test.janet") 10))
+          (assert.equals "bp-key-2" (. (. bps "./test.janet") 20)))
+        ;; Clear breakpoints
+        (n.assoc (state.get) :breakpoints nil)
+        (assert.is_nil (state.get :breakpoints))))
+
+    (it "can store and retrieve debug position"
+      (fn []
+        ;; Set debug position
+        (n.assoc (state.get) :debug-position {:path "./test.janet"
+                                              :line 15
+                                              :col 3})
+        ;; Retrieve debug position
+        (let [pos (state.get :debug-position)]
+          (assert.is_table pos)
+          (assert.equals "./test.janet" pos.path)
+          (assert.equals 15 pos.line)
+          (assert.equals 3 pos.col))
+        ;; Clear debug position
+        (n.assoc (state.get) :debug-position nil)
+        (assert.is_nil (state.get :debug-position))))
+
+    (it "can store and retrieve original SignColumn highlight"
+      (fn []
+        ;; Set original highlight
+        (n.assoc (state.get) :original-signcol-hl "NormalNC")
+        ;; Retrieve it
+        (let [hl (state.get :original-signcol-hl)]
+          (assert.equals "NormalNC" hl))
+        ;; Clear it
+        (n.assoc (state.get) :original-signcol-hl nil)
+        (assert.is_nil (state.get :original-signcol-hl))))))

@@ -3,8 +3,9 @@
 
 ;; Mock dependencies before requiring handler
 (var log-calls [])
-(var state-data {:conn {}})
+(var state-data {:conn {} :breakpoints {}})
 (var editor-calls [])
+(var ui-calls [])
 
 (local mock-log
   {:append (fn [sec lines]
@@ -27,12 +28,25 @@
                 (table.insert result part))
               result))})
 
+(local mock-ui
+  {:add-breakpoint-sign (fn [bufnr file-path line]
+                          (table.insert ui-calls {:op "add" :bufnr bufnr :file-path file-path :line line}))
+   :remove-breakpoint-sign (fn [file-path line]
+                             (table.insert ui-calls {:op "remove" :file-path file-path :line line}))
+   :clear-breakpoint-signs (fn []
+                             (table.insert ui-calls {:op "clear"}))
+   :show-debug-indicators (fn [bufnr file-path line]
+                            (table.insert ui-calls {:op "show-debug" :bufnr bufnr :file-path file-path :line line}))
+   :hide-debug-indicators (fn []
+                            (table.insert ui-calls {:op "hide-debug"}))})
+
 ;; Use real nfnl instead of mocking it
 (local n (require :nfnl.core))
 
 ;; Install mocks
 (tset package.loaded :grapple.client.log mock-log)
 (tset package.loaded :grapple.client.state mock-state)
+(tset package.loaded :grapple.client.ui mock-ui)
 (tset package.loaded :conjure.editor mock-editor)
 (tset package.loaded :conjure.nfnl.string mock-str)
 (tset package.loaded :conjure.nfnl.core n)
@@ -45,8 +59,9 @@
     (before_each
       (fn []
         (set log-calls [])
-        (set state-data {:conn {}})
-        (set editor-calls [])))
+        (set state-data {:conn {} :breakpoints {}})
+        (set editor-calls [])
+        (set ui-calls [])))
 
     (it "handles sess.new messages"
       (fn []
@@ -121,6 +136,89 @@
           (assert.equals 1 (length log-calls))
           (assert.equals :result (. (. log-calls 1) :sec)))))
 
+    (it "handles dbg.brk.add response"
+      (fn []
+        (let [msg {:op "dbg.brk.add"
+                   :tag "ret"
+                   :janet/bp "./test.janet:10"}
+              opts {:bufnr 1
+                    :file-path "./test.janet"
+                    :line 10}]
+          (handler.handle-message msg opts)
+          ;; Should log breakpoint added to debug section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :debug (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "Breakpoint added: ./test.janet:10" (. lines 1))))))
+
+    (it "handles dbg.brk.rem response"
+      (fn []
+        (let [msg {:op "dbg.brk.rem"
+                   :tag "ret"
+                   :janet/bp "./test.janet:10"}
+              opts {:file-path "./test.janet"
+                    :line 10}]
+          (handler.handle-message msg opts)
+          ;; Should log breakpoint removed to debug section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :debug (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "Breakpoint removed: ./test.janet:10" (. lines 1))))))
+
+    (it "handles dbg.brk.clr response"
+      (fn []
+        (let [msg {:op "dbg.brk.clr"
+                   :tag "ret"}
+              opts {}]
+          (handler.handle-message msg opts)
+          ;; Should log all breakpoints cleared to debug section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :debug (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "All breakpoints cleared" (. lines 1))))))
+
+    (it "handles dbg.insp.stk response with stack frames"
+      (fn []
+        (let [msg {:op "dbg.insp.stk"
+                   :tag "ret"
+                   :val "Stack frame data..."}
+              opts {}]
+          (handler.handle-message msg opts)
+          ;; Should log stack frames to result section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :result (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "Stack frame data..." (. lines 1))))))
+
+    (it "handles dbg.insp.stk response without stack frames"
+      (fn []
+        (let [msg {:op "dbg.insp.stk"
+                   :tag "ret"}
+              opts {}]
+          (handler.handle-message msg opts)
+          ;; Should log no frames message to debug section
+          (assert.equals 1 (length log-calls))
+          (assert.equals :debug (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals "No stack frames available" (. lines 1))))))
+
+    (it "handles debug signal within env.eval"
+      (fn []
+        (let [msg {:op "env.eval"
+                   :tag "sig"
+                   :val "debug"
+                   :janet/path "./test.janet"
+                   :janet/line 10}
+              opts {}]
+          (handler.handle-message msg opts)
+          ;; Should log pause message to debug section (2 messages: pause + instructions)
+          (assert.equals 2 (length log-calls))
+          (assert.equals :debug (. (. log-calls 1) :sec))
+          (assert.equals :debug (. (. log-calls 2) :sec))
+          (let [line1 (. (. log-calls 1) :lines)
+                line2 (. (. log-calls 2) :lines)]
+            (assert.equals "Paused at breakpoint at ./test.janet:10" (. line1 1))
+            (assert.equals "Use <localleader>dis to inspect stack, <localleader>dsc to continue" (. line2 1))))))
     (it "handles error messages"
       (fn []
         (let [msg {:tag "err"

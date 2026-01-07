@@ -44,4 +44,21 @@ end
 local function env_cmpl(conn, opts)
   return conn.send({op = "env.cmpl", ns = opts["file-path"], sym = opts.code}, opts)
 end
-return {["sess-new"] = sess_new, ["sess-end"] = sess_end, ["sess-list"] = sess_list, ["serv-info"] = serv_info, ["serv-stop"] = serv_stop, ["serv-rest"] = serv_rest, ["env-eval"] = env_eval, ["env-load"] = env_load, ["env-stop"] = env_stop, ["env-doc"] = env_doc, ["env-cmpl"] = env_cmpl}
+local function dbg_brk_add(conn, opts)
+  return conn.send({op = "dbg.brk.add", path = opts["file-path"], line = opts.line, col = (opts.col or 1)}, opts)
+end
+local function dbg_brk_rem(conn, opts)
+  return conn.send({op = "dbg.brk.rem", path = opts["file-path"], line = opts.line}, opts)
+end
+local function dbg_brk_clr(conn, opts)
+  return conn.send({op = "dbg.brk.clr"}, opts)
+end
+local function dbg_step_cont(conn, opts)
+  log.append("debug", {"Continuing execution..."})
+  return conn.send({op = "dbg.step.cont"}, opts)
+end
+local function dbg_insp_stk(conn, opts)
+  log.append("debug", {"Inspecting stack..."})
+  return conn.send({op = "dbg.insp.stk"}, opts)
+end
+return {["sess-new"] = sess_new, ["sess-end"] = sess_end, ["sess-list"] = sess_list, ["serv-info"] = serv_info, ["serv-stop"] = serv_stop, ["serv-rest"] = serv_rest, ["env-eval"] = env_eval, ["env-load"] = env_load, ["env-stop"] = env_stop, ["env-doc"] = env_doc, ["env-cmpl"] = env_cmpl, ["dbg-brk-add"] = dbg_brk_add, ["dbg-brk-rem"] = dbg_brk_rem, ["dbg-brk-clr"] = dbg_brk_clr, ["dbg-step-cont"] = dbg_step_cont, ["dbg-insp-stk"] = dbg_insp_stk}

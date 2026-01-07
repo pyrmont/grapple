@@ -10,13 +10,14 @@ local remote = autoload("grapple.remote")
 local request = autoload("grapple.client.request")
 local state = autoload("grapple.client.state")
 local ts = autoload("conjure.tree-sitter")
+local ui = autoload("grapple.client.ui")
 local buf_suffix = ".janet"
 local comment_prefix = "# "
 local comment_node_3f = ts["lisp-comment-node?"]
 local form_node_3f = ts["node-surrounded-by-form-pair-chars?"]
 config.merge({client = {janet = {mrepl = {connection = {default_host = "127.0.0.1", default_port = "3737", lang = "net.inqk/janet-1.0", ["auto-repl"] = {enabled = true}}}}}})
 if config["get-in"]({"mapping", "enable_defaults"}) then
-  config.merge({client = {janet = {mrepl = {mapping = {connect = "cc", disconnect = "cd", ["start-server"] = "cs", ["stop-server"] = "cS"}}}}})
+  config.merge({client = {janet = {mrepl = {mapping = {connect = "cc", disconnect = "cd", ["start-server"] = "cs", ["stop-server"] = "cS", ["add-breakpoint"] = "dba", ["remove-breakpoint"] = "dbr", ["clear-breakpoints"] = "dbc", continue = "dsc", ["inspect-stack"] = "dis"}}}}})
 else
 end
 local function process_alive_3f(job_id)
@@ -244,17 +245,71 @@ local function def_str(opts)
   end
   return with_conn_or_warn(_35_, opts)
 end
+local function add_breakpoint()
+  local function _36_(conn)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local file_path = vim.api.nvim_buf_get_name(bufnr)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local line = cursor[1]
+    local col = cursor[2]
+    return request["dbg-brk-add"](conn, {["file-path"] = file_path, line = line, col = (col + 1), bufnr = bufnr})
+  end
+  return with_conn_or_warn(_36_, {})
+end
+local function continue_execution()
+  local function _37_(conn)
+    return request["dbg-step-cont"](conn, {})
+  end
+  return with_conn_or_warn(_37_, {})
+end
+local function inspect_stack()
+  local function _38_(conn)
+    return request["dbg-insp-stk"](conn, {})
+  end
+  return with_conn_or_warn(_38_, {})
+end
+local function remove_breakpoint()
+  local function _39_(conn)
+    local bufnr = vim.api.nvim_get_current_buf()
+    local file_path = vim.api.nvim_buf_get_name(bufnr)
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    local line = cursor[1]
+    return request["dbg-brk-rem"](conn, {["file-path"] = file_path, line = line})
+  end
+  return with_conn_or_warn(_39_, {})
+end
+local function clear_breakpoints()
+  local function _40_(conn)
+    return request["dbg-brk-clr"](conn, {})
+  end
+  return with_conn_or_warn(_40_, {})
+end
 local function on_filetype()
+  ui["init-breakpoint-signs"]()
+  ui["init-debug-sign"]()
+  local function _41_()
+    if connected_3f() then
+      clear_breakpoints()
+    else
+    end
+    return nil
+  end
+  vim.api.nvim_create_autocmd("BufWritePost", {buffer = 0, callback = _41_, desc = "Clear all breakpoints after buffer write"})
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _36_()
+  local function _43_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _36_, {desc = "Connect to a REPL"})
-  local function _37_()
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _43_, {desc = "Connect to a REPL"})
+  local function _44_()
     return start_server({})
   end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _37_, {desc = "Start the Grapple server"})
-  return mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _44_, {desc = "Start the Grapple server"})
+  mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
+  mapping.buf("JanetAddBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "add-breakpoint"}), add_breakpoint, {desc = "Add a breakpoint at the cursor"})
+  mapping.buf("JanetRemoveBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "remove-breakpoint"}), remove_breakpoint, {desc = "Remove a breakpoint at the cursor"})
+  mapping.buf("JanetClearBreakpoints", config["get-in"]({"client", "janet", "mrepl", "mapping", "clear-breakpoints"}), clear_breakpoints, {desc = "Clear all breakpoints"})
+  mapping.buf("JanetContinue", config["get-in"]({"client", "janet", "mrepl", "mapping", "continue"}), continue_execution, {desc = "Continue execution from breakpoint"})
+  return mapping.buf("JanetInspectStack", config["get-in"]({"client", "janet", "mrepl", "mapping", "inspect-stack"}), inspect_stack, {desc = "Inspect the current stack"})
 end
 local function on_load()
   return nil
@@ -271,12 +326,12 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _39_(result)
+    local function _46_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _39_)
+    return n.assoc(opts, "on-result", _46_)
   else
     return opts
   end
 end
-return {["buf-suffix"] = buf_suffix, ["comment-node?"] = comment_node_3f, ["comment-prefix"] = comment_prefix, ["start-server"] = start_server, ["stop-server"] = stop_server, connect = connect, disconnect = disconnect, ["def-str"] = def_str, ["doc-str"] = doc_str, ["eval-file"] = eval_file, ["eval-str"] = eval_str, ["form-node?"] = form_node_3f, ["modify-client-exec-fn-opts"] = modify_client_exec_fn_opts, ["on-exit"] = on_exit, ["on-filetype"] = on_filetype, ["on-load"] = on_load}
+return {["buf-suffix"] = buf_suffix, ["comment-node?"] = comment_node_3f, ["comment-prefix"] = comment_prefix, ["start-server"] = start_server, ["stop-server"] = stop_server, connect = connect, disconnect = disconnect, ["def-str"] = def_str, ["doc-str"] = doc_str, ["eval-file"] = eval_file, ["eval-str"] = eval_str, ["form-node?"] = form_node_3f, ["modify-client-exec-fn-opts"] = modify_client_exec_fn_opts, ["on-exit"] = on_exit, ["on-filetype"] = on_filetype, ["on-load"] = on_load, ["add-breakpoint"] = add_breakpoint, ["remove-breakpoint"] = remove_breakpoint, ["continue-execution"] = continue_execution, ["inspect-stack"] = inspect_stack, ["clear-breakpoints"] = clear_breakpoints}

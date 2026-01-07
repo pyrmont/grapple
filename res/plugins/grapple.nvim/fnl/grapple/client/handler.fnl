@@ -4,6 +4,7 @@
 (local n (autoload :conjure.nfnl.core))
 (local state (autoload :grapple.client.state))
 (local str (autoload :conjure.nfnl.string))
+(local ui (autoload :grapple.client.ui))
 
 (fn upcase [s n]
   (let [start (string.sub s 1 n)
@@ -45,6 +46,21 @@
 
     (= "note" resp.tag)
     (log.append :note [resp.val])
+
+    (and (= "sig" resp.tag) (= "debug" resp.val))
+    (let [location (if (and resp.janet/path resp.janet/line)
+                     (.. " at " resp.janet/path ":" resp.janet/line)
+                     "")]
+      (log.append :debug [(.. "Paused at breakpoint" location)])
+      (log.append :debug ["Use <localleader>dis to inspect stack, <localleader>dsc to continue"])
+      ; Show visual debug indicators
+      (when (and resp.janet/path resp.janet/line)
+        (let [file-path resp.janet/path
+              line resp.janet/line
+              ; Find the buffer for this file
+              bufnr (vim.fn.bufnr file-path)]
+          (when (not= bufnr -1)
+            (ui.show-debug-indicators bufnr file-path line)))))
 
     (and (= "ret" resp.tag) (not= nil resp.val))
     (do
@@ -104,6 +120,54 @@
         (editor.go-to path line col)
         (display-error "Oh no")))))
 
+(fn handle-dbg-brk-add [resp opts]
+  (if
+    (= "ret" resp.tag)
+    (do
+      (log.append :debug [(.. "Breakpoint added: " (. resp "janet/bp"))])
+      (ui.add-breakpoint-sign opts.bufnr opts.file-path opts.line))
+    (= "err" resp.tag)
+    (display-error (.. "Failed to add breakpoint: " resp.val) resp)))
+
+(fn handle-dbg-brk-rem [resp opts]
+  (if
+    (= "ret" resp.tag)
+    (do
+      (log.append :debug [(.. "Breakpoint removed: " (. resp "janet/bp"))])
+      (ui.remove-breakpoint-sign opts.file-path opts.line))
+    (= "err" resp.tag)
+    (display-error (.. "Failed to remove breakpoint: " resp.val) resp)))
+
+(fn handle-dbg-brk-clr [resp]
+  (if
+    (= "ret" resp.tag)
+    (do
+      (log.append :debug ["All breakpoints cleared"])
+      (ui.clear-breakpoint-signs))
+    (= "err" resp.tag)
+    (display-error (.. "Failed to clear breakpoints: " resp.val) resp)))
+
+(fn handle-dbg-step-cont [resp]
+  (if
+    (= "ret" resp.tag)
+    (do
+      ; (log.append :debug ["Continued execution"])
+      ; Hide debug indicators when execution continues
+      (ui.hide-debug-indicators))
+    (= "err" resp.tag)
+    (display-error (.. "Failed to continue: " resp.val) resp)))
+
+(fn handle-dbg-insp-stk [resp]
+  (if
+    (and (= "ret" resp.tag) resp.val)
+    (do
+      ; (log.append :debug ["Stack frames:"])
+      (log.append :result [resp.val]))
+    (= "ret" resp.tag)
+    (log.append :debug ["No stack frames available"])
+    (= "err" resp.tag)
+    (display-error (.. "Failed to inspect stack: " resp.val) resp)))
+
 (fn handle-message [msg opts]
   (when msg
    (let [action (or (and opts opts.action) nil)]
@@ -151,6 +215,21 @@
 
       (= "env.cmpl" msg.op)
       (handle-env-cmpl msg)
+
+      (= "dbg.brk.add" msg.op)
+      (handle-dbg-brk-add msg opts)
+
+      (= "dbg.brk.rem" msg.op)
+      (handle-dbg-brk-rem msg opts)
+
+      (= "dbg.brk.clr" msg.op)
+      (handle-dbg-brk-clr msg)
+
+      (= "dbg.step.cont" msg.op)
+      (handle-dbg-step-cont msg)
+
+      (= "dbg.insp.stk" msg.op)
+      (handle-dbg-insp-stk msg)
 
       (do
         (log.append :error ["Unrecognised message"]))))))

@@ -9,6 +9,38 @@
   (put bndg :value new-val)
   (put env sym bndg))
 
+(defn- collect-affected-nodes [initial-path initial-sym sess]
+  (def affected @[])
+  (def visited @{})
+  (def queue @[[initial-path initial-sym]])
+  (while (not (empty? queue))
+    (def [path sym] (array/pop queue))
+    (def key (string path ":" sym))
+    # Skip if already visited
+    (unless (in visited key)
+      (put visited key true)
+      (def graph (get-in sess [:dep-graph path]))
+      (when graph
+        # Add all local dependents to the affected set
+        (def local-deps (deps/get-reeval-order path sym sess))
+        (each dep local-deps
+          (def dep-key (string path ":" dep))
+          (unless (in visited dep-key)
+            (array/push affected [path dep])
+            (array/push queue [path dep])))
+        # Add cross-file dependents
+        (def importers (get-in graph [:importers sym] @[]))
+        (each {:file other-path :as imported-sym} importers
+          (def other-graph (get-in sess [:dep-graph other-path]))
+          (when other-graph
+            # Find what depends on the imported symbol in the other file
+            (def other-deps (deps/get-reeval-order other-path imported-sym sess))
+            (each other-dep other-deps
+              (def other-key (string other-path ":" other-dep))
+              (unless (in visited other-key)
+                (array/push affected [other-path other-dep])
+                (array/push queue [other-path other-dep]))))))))
+  affected)
 (def- eval-root-env
   (do
     (def new-env (table/clone root-env))
@@ -80,27 +112,62 @@
                   "janet/col" col})
     (send-err full-msg details)))
 
-(defn- debugger-on-status [env level send-ret send-err reevaluating]
+(defn- debugger-on-status [env level opts]
+  # This function is called within the evaluator after resuming the evaluator
+  # fiber. It is named :debugger because this function is what makes it possible
+  # to perform remote debugging.
   (fn :debugger [f x where line col]
-    (def fs (fiber/status f))
-    (if (= :dead fs)
+    (case (fiber/status f)
+      :dead
       (do
         (put env '_ @{:value x})
-        (send-ret (string/format "%q" x)
-                  {"done" false
-                   "janet/path" where
-                   "janet/line" line
-                   "janet/col" col
-                   # Mark as reevaluation if in a cascade
-                   "janet/reeval?" (not (empty? reevaluating))}))
+        (def send (opts :ret))
+        (def reeval? (not (empty? (opts :reevaluating))))
+        (send (string/format "%q" x)
+              {"done" false
+               "janet/path" where
+               "janet/line" line
+               "janet/col" col
+               # Mark as reevaluation if in a cascade
+               "janet/reeval?" reeval?}))
+      :debug
       (do
-        (send-err (string (fiber/status f) ": " x)
-                  {"janet/path" where
-                   "janet/line" line
-                   "janet/col" col
-                   "janet/stack" (util/stack f)})
-        # (if (get env :debug) (debugger f level))
-        ))))
+        (def stack (debug/stack f))
+        (def frame (first stack))
+        (def send (opts :sig))
+        (send "debug"
+              {"janet/path" (frame :source)
+               "janet/line" (frame :source-line)
+               "janet/col" (frame :source-column)})
+        # Debug loop for debugging commands
+        (var action (debug)) # yields back to parent fiber
+        (forever
+          (case action
+            :continue
+            (break)
+            :stack
+            (do
+              (def frames (debug/stack f))
+              (def frame-data
+                (map (fn [fr]
+                       {:pc (fr :pc)
+                        :name (fr :name)
+                        :path (fr :source)
+                        :line (fr :source-line)
+                        :col (fr :source-column)
+                        :locals (fr :locals)})
+                     frames))
+              (set action (debug frame-data))) # yields back to parent fiber
+            # unrecognised action
+            (error (string "unknown debug action: " action)))))
+      # errors
+      (do
+        (def send (opts :err))
+        (send (string (fiber/status f) ": " x)
+              {"janet/path" where
+               "janet/line" line
+               "janet/col" col
+               "janet/stack" (util/stack f)})))))
 
 (defn- warn-compile [send-note]
   (fn :warn-compile [msg level where &opt line col]
@@ -110,49 +177,109 @@
                   "janet/col" col})
     (send-note full-msg details)))
 
-(defn- reeval-cross-dependents [import-list source-sym source-env sess send-note]
-  (each import-info import-list
-    (def {:file other-path :as imported-sym} import-info)
-    (def other-env (module/cache other-path))
-    (def other-graph (get-in sess [:dep-graph other-path]))
-    (when (and other-env other-graph)
-      # Update the imported binding to point to the current binding
-      (def source-binding (get source-env source-sym))
-      (when source-binding
-        (put other-env imported-sym source-binding))
-      # Find symbols in the other file that depend on the imported symbol
-      (def to-reeval (deps/get-reeval-order other-graph imported-sym))
-      (unless (empty? to-reeval)
-        (def dep-names (string/join (map string to-reeval) ", "))
-        (send-note (string "Re-evaluating in " other-path ": " dep-names) {}))
-      # Re-evaluate each dependent in the other file
-      (each other-dep to-reeval
-        (def source (get-in other-graph [:sources other-dep :form]))
-        (when source
-          # Compile and evaluate in the other file's environment
-          (def compiled (compile source other-env other-path))
-          (when (function? compiled)
-            (compiled))))
-      # Cascade: for each symbol we re-evaluated, check if it has importers
-      # and recursively trigger reevaluation in those importing files
-      (each other-dep to-reeval
-        (def importers (get-in other-graph [:importers other-dep] @[]))
-        (unless (empty? importers)
-          (reeval-cross-dependents importers other-dep other-env sess send-note))))))
-
 # Public functions
 
 (defn cross-reeval
-  "Triggers re-evaluation of cross-file dependents"
-  [path sess send-note]
+  [path sess req send]
   (def graph (get-in sess [:dep-graph path]))
   (def source-env (module/cache path))
   # no dependency graph and source environment so return early
   (unless (and graph source-env)
     (break))
+  # Collect all symbols in this file that have cross-file importers
+  (def symbols-with-importers @[])
   (eachp [sym import-list] (get graph :importers)
     (unless (empty? import-list)
-      (reeval-cross-dependents import-list sym source-env sess send-note))))
+      (array/push symbols-with-importers sym)))
+  # Collect all affected nodes across all files
+  (def all-affected @[])
+  (each sym symbols-with-importers
+    (def affected (collect-affected-nodes path sym sess))
+    (array/concat all-affected affected))
+  # Remove duplicates
+  (def seen @{})
+  (def unique-affected @[])
+  (each [p s] all-affected
+    (def key (string p ":" s))
+    (unless (in seen key)
+      (put seen key true)
+      (array/push unique-affected [p s])))
+  # If nothing to re-evaluate, return early
+  (when (empty? unique-affected)
+    (break))
+  # Topologically sort all affected nodes
+  (def ordered (deps/topological-sort unique-affected sess))
+  # Track which files we've sent notifications for
+  (def notified-files @{})
+  # Re-evaluate in topological order, sending note before first symbol in each file
+  (each [other-path other-sym] ordered
+    # Send notification for this file if we haven't yet
+    (unless (in notified-files other-path)
+      (put notified-files other-path true)
+      # Collect all symbols from this file that will be re-evaluated
+      (def file-syms (filter (fn [[p s]] (= p other-path)) ordered))
+      (def sym-names (map (fn [[p s]] s) file-syms))
+      (def dep-names (string/join (map string sym-names) ", "))
+      (send {"tag" "note"
+             "op" "env.eval"
+             "lang" util/lang
+             "req" (req "id")
+             "sess" (req "sess")
+             "val" (string "Re-evaluating in " other-path ": " dep-names)}))
+    # Re-evaluate this symbol
+    (def other-graph (get-in sess [:dep-graph other-path]))
+    (def other-env (module/cache other-path))
+    (when (and other-graph other-env)
+      # Update imported bindings before re-evaluating
+      (def deps (get-in other-graph [:deps other-sym] @[]))
+      (each dep deps
+        # Check if this dependency is imported from another file
+        (def binding (get other-env dep))
+        (when binding
+          (def source-map (get binding :source-map))
+          (when (and (tuple? source-map) (not= (get source-map 0) other-path))
+            (def dep-path (get source-map 0))
+            (def dep-env (module/cache dep-path))
+            (when dep-env
+              # Find and update the binding
+              (eachp [source-sym source-binding] dep-env
+                (when (= (get source-binding :source-map) source-map)
+                  (put other-env dep source-binding)
+                  (break)))))))
+      # Re-evaluate the symbol
+      (def source (get-in other-graph [:sources other-sym :form]))
+      (when source
+        (def compiled (compile source other-env other-path))
+        (if (function? compiled)
+          # Evaluate and send return message
+          (do
+            (def [ok? result] (protect (compiled)))
+            (if ok?
+              (send {"tag" "ret"
+                     "op" "env.eval"
+                     "lang" util/lang
+                     "req" (req "id")
+                     "sess" (req "sess")
+                     "done" false
+                     "val" (string/format "%q" result)
+                     "janet/path" other-path
+                     "janet/reeval?" true})
+              (send {"tag" "err"
+                     "op" "env.eval"
+                     "lang" util/lang
+                     "req" (req "id")
+                     "sess" (req "sess")
+                     "val" result
+                     "janet/path" other-path})))
+          # Compilation failed
+          (let [{:error err} compiled]
+            (send {"tag" "err"
+                   "op" "env.eval"
+                   "lang" util/lang
+                   "req" (req "id")
+                   "sess" (req "sess")
+                   "val" err
+                   "janet/path" other-path})))))))
 
 (defn eval-make-env [&opt parent]
   (default parent eval-root-env)
@@ -168,6 +295,7 @@
   (def out-1 (util/make-send-out req send "out"))
   (def out-2 (util/make-send-out req send "err"))
   (def ret (util/make-send-ret req send))
+  (def sig (util/make-send-sig req send))
   (defn module-make-env [&opt parent no-wrap?]
     (default parent eval-root-env)
     (def new-env (if no-wrap? parent (table/setproto @{} parent)))
@@ -177,9 +305,12 @@
                         :grapple/eval-env? true})
     (table/setproto new-eval-env new-env))
   (def eval1-env (module-make-env env true))
-  # track symbols currently being re-evaluated to prevent infinite loops
   (def reevaluating @{})
-  (def on-status (debugger-on-status env 1 ret err reevaluating))
+  (def opts {:ret ret
+             :err err
+             :sig sig
+             :reevaluating reevaluating})
+  (def on-status (debugger-on-status env 1 opts))
   (def on-compile-error (bad-compile err))
   (def on-compile-warning (warn-compile note))
   (def on-parse-error (bad-parse err))
@@ -206,10 +337,10 @@
           g)))
   # forward declaration for mutual recursion
   (var eval1 nil)
-  (defn- reevaluate-dependents [sym]
+  (defn- reevaluate-depnts [sym]
     "Re-evaluates all symbols that depend on sym"
     (def graph (get-dep-graph path))
-    (def to-reeval (deps/get-reeval-order graph sym))
+    (def to-reeval (deps/get-reeval-order path sym sess))
     # send informational message only at the top level (when not already reevaluating)
     (unless (or (empty? to-reeval) (not (empty? reevaluating)))
       (def dep-names (string/join (map string to-reeval) ", "))
@@ -224,17 +355,15 @@
           # re-evaluate using eval1
           (eval1 source))
         (put reevaluating dep nil)))
-    # re-evaluate cross-file dependents (only at top level)
+    # Trigger cross-file re-evaluation after local dependents (only at top level)
     (when (empty? reevaluating)
-      (def importers (get-in graph [:importers sym] @[]))
-      (unless (empty? importers)
-        (reeval-cross-dependents importers sym env sess note))))
+      (cross-reeval path sess req send)))
   # evaluate 1 source form in a protected manner
   (def lints @[])
   (set eval1 (fn eval1-impl [source &opt l c]
     # check if this is a redefinition (before tracking the new def)
     (def graph (get-dep-graph path))
-    (var is-redef false)
+    (var redef? false)
     (var defined-sym nil)
     # check if symbol already exists before tracking
     (when (and (tuple? source) (> (length source) 1))
@@ -245,13 +374,13 @@
         (if (symbol? pattern)
           (do
             (set defined-sym pattern)
-            (set is-redef (not (nil? (get-in graph [:sources pattern])))))
+            (set redef? (not (nil? (get-in graph [:sources pattern])))))
           # for patterns, check first symbol (they all share the same source)
           (when (or (= head 'def) (= head 'var))
             (def syms (deps/extract-pattern-symbols pattern))
             (when (not (empty? syms))
               (set defined-sym (get syms 0))
-              (set is-redef (not (nil? (get-in graph [:sources (get syms 0)])))))))))
+              (set redef? (not (nil? (get-in graph [:sources (get syms 0)])))))))))
     # track the definition
     (deps/track-definition graph source env path sess)
     (var good true)
@@ -288,10 +417,11 @@
       (def res (resume f resumeval))
       (when good
         (set resumeval (on-status f res where l c))))
-    # after successful evaluation, re-evaluate dependents if this was a redefinition
-    # but only at the top level - nested calls are already handled by the outer cascade
-    (when (and good is-redef defined-sym (empty? reevaluating))
-      (reevaluate-dependents defined-sym))))
+    # after successful evaluation, re-evaluate dependents if this was a
+    # redefinition but only at the top level (nested calls are already handled
+    # by the outer cascade)
+    (when (and good redef? defined-sym (empty? reevaluating))
+      (reevaluate-depnts defined-sym))))
   # handle parser error in the correct environment
   (defn parse-err [p where]
     (def f (coro

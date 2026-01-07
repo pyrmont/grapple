@@ -84,6 +84,41 @@ local function _2_()
     n.assoc(state.get(), "token", nil)
     return assert.is_nil(state.get("token"))
   end
-  return it("can store and retrieve authentication token", _13_)
+  it("can store and retrieve authentication token", _13_)
+  local function _14_()
+    n.assoc(state.get(), "breakpoints", {["./test.janet"] = {[10] = "bp-key-1", [20] = "bp-key-2"}})
+    do
+      local bps = state.get("breakpoints")
+      assert.is_table(bps)
+      assert.equals("bp-key-1", bps["./test.janet"][10])
+      assert.equals("bp-key-2", bps["./test.janet"][20])
+    end
+    n.assoc(state.get(), "breakpoints", nil)
+    return assert.is_nil(state.get("breakpoints"))
+  end
+  it("can store and retrieve breakpoints", _14_)
+  local function _15_()
+    n.assoc(state.get(), "debug-position", {path = "./test.janet", line = 15, col = 3})
+    do
+      local pos = state.get("debug-position")
+      assert.is_table(pos)
+      assert.equals("./test.janet", pos.path)
+      assert.equals(15, pos.line)
+      assert.equals(3, pos.col)
+    end
+    n.assoc(state.get(), "debug-position", nil)
+    return assert.is_nil(state.get("debug-position"))
+  end
+  it("can store and retrieve debug position", _15_)
+  local function _16_()
+    n.assoc(state.get(), "original-signcol-hl", "NormalNC")
+    do
+      local hl = state.get("original-signcol-hl")
+      assert.equals("NormalNC", hl)
+    end
+    n.assoc(state.get(), "original-signcol-hl", nil)
+    return assert.is_nil(state.get("original-signcol-hl"))
+  end
+  return it("can store and retrieve original SignColumn highlight", _16_)
 end
 return describe("get", _2_)
