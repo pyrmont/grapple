@@ -4,11 +4,6 @@
 (defn- dprint [v]
   (xprintf stdout "%q" v))
 
-(defn- rebind [env sym new-val]
-  (def bndg (table/clone (env sym)))
-  (put bndg :value new-val)
-  (put env sym bndg))
-
 (defn- collect-affected-nodes [initial-path initial-sym sess]
   (def affected @[])
   (def visited @{})
@@ -44,6 +39,10 @@
 
 (def- eval-root-env
   (do
+    (defn rebind [env sym new-val]
+      (def bndg (table/clone (env sym)))
+      (put bndg :value new-val)
+      (put env sym bndg))
     (def new-env (table/clone root-env))
     (defn new-make-env [&opt parent]
       (default parent new-env)
