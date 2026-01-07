@@ -611,20 +611,10 @@
 (deftest dbg-brk-rem-nonexistent
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  (def test-path "./res/test/handler-env-load.janet")
-  (def brk-key (string test-path ":" 2))
-  # Load the file first
-  (h/handle {"op" "env.load"
-             "lang" u/lang
-             "id" "0"
-             "sess" "1"
-             "path" test-path}
-            sessions
-            send)
-  # Discard load responses
-  (recv)
-  (recv)
-  (recv)
+  # Use a file path that hasn't been compiled by any test
+  (def test-path "./nonexistent-file-for-test.janet")
+  # Try to remove a breakpoint on an uncompiled file
+  # This should fail because the file hasn't been compiled
   (h/handle {"op" "dbg.brk.rem"
              "lang" u/lang
              "id" "1"

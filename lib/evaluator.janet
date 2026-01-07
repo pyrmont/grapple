@@ -41,6 +41,7 @@
                 (array/push affected [other-path other-dep])
                 (array/push queue [other-path other-dep]))))))))
   affected)
+
 (def- eval-root-env
   (do
     (def new-env (table/clone root-env))
