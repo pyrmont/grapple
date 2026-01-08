@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -e  # Exit on error
+
+jeep test -R
+./res/scripts/unit-tests
+./res/scripts/system-tests
+
+# Capture the exit code
+TEST_EXIT_CODE=$?
+exit $TEST_EXIT_CODE
