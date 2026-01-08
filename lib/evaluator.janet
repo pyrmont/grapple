@@ -236,22 +236,19 @@
   # forward declaration for mutual recursion
   (var eval1 nil)
   (def lints @[])
-  # helper to evaluate source in a different file's environment
-  # but with the same fiber context (output, errors, etc.)
-  (defn eval-in-file [source target-env target-path &opt l c]
-    (def target-eval-env (module-make-env target-env true))
-    (put target-eval-env :current-file target-path)
+  # helper to compile and evaluate source in a fiber
+  (defn compile-and-eval [source env eval-env path &opt l c]
     (var good true)
     (var resumeval nil)
     (def f
       (fiber/new
         (fn []
           (array/clear lints)
-          (def res (compile source target-env target-path lints))
+          (def res (compile source env path lints))
           (unless (empty? lints)
-            (def levels (get target-env *lint-levels* lint-levels))
-            (def lint-error (get target-env *lint-error*))
-            (def lint-warning (get target-env *lint-warn*))
+            (def levels (get env *lint-levels* lint-levels))
+            (def lint-error (get env *lint-error*))
+            (def lint-warning (get env *lint-warn*))
             (def lint-error (or (get levels lint-error lint-error) 0))
             (def lint-warning (or (get levels lint-warning lint-warning) 2))
             (each [level line col msg] lints
@@ -259,22 +256,35 @@
               (cond
                 (<= lvl lint-error) (do
                                       (set good false)
-                                      (on-compile-error msg nil target-path (or line l) (or col c)))
-                (<= lvl lint-warning) (on-compile-warning msg level target-path (or line l) (or col c)))))
+                                      (on-compile-error msg nil path (or line l) (or col c)))
+                (<= lvl lint-warning) (on-compile-warning msg level path (or line l) (or col c)))))
           (when good
             (if (= (type res) :function)
-              (evaluator res source target-env target-path)
+              (evaluator res source env path)
               (do
                 (set good false)
                 (def {:error err :line line :column column :fiber errf} res)
-                (on-compile-error err errf target-path (or line l) (or column c))))))
+                (on-compile-error err errf path (or line l) (or column c))))))
         guard
-        target-eval-env))
+        eval-env))
     (while (fiber/can-resume? f)
       (def res (resume f resumeval))
       (when good
-        (set resumeval (on-status f res target-path l c)))))
-  (defn reevaluate-depnts [sym]
+        (set resumeval (on-status f res path l c))))
+    good)
+  # helper to evaluate source in a different file's environment
+  # but with the same fiber context (output, errors, etc.)
+  (defn eval-in-file [source target-env target-path &opt l c]
+    (def target-eval-env (module-make-env target-env true))
+    (put target-eval-env :current-file target-path)
+    (compile-and-eval source target-env target-eval-env target-path l c))
+  # helper to re-evaluate a symbol with tracking
+  (defn reeval-with-tracking [sym f]
+    (unless (in reevaluating sym)
+      (put reevaluating sym true)
+      (f)
+      (put reevaluating sym nil)))
+  (defn reeval-depents [sym]
     (def graph (get-dep-graph path))
     (def to-reeval (deps/get-reeval-order path sym sess))
     # send informational message only at the top level (when not already reevaluating)
@@ -283,12 +293,8 @@
       (note (string "Re-evaluating dependents of " sym ": " dep-names)))
     # re-evaluate each dependent using stored source
     (each dep to-reeval
-      # skip if already being re-evaluated (prevents circular dependency loops)
-      (unless (in reevaluating dep)
-        (when (def source (get-in graph [:sources dep :form]))
-          (put reevaluating dep true)
-          (eval1 source)
-          (put reevaluating dep nil))))
+      (when (def source (get-in graph [:sources dep :form]))
+        (reeval-with-tracking dep (fn [] (eval1 source)))))
     # return early if already reevaluating
     (unless (empty? reevaluating)
       (break))
@@ -334,11 +340,8 @@
                     (put other-env dep source-binding)
                     (break)))))))
         # Re-evaluate the symbol using the fiber-based evaluator
-        # Mark as being re-evaluated so reeval? flag is set correctly
         (when (def source (get-in other-graph [:sources other-sym :form]))
-          (put reevaluating other-sym true)
-          (eval-in-file source other-env other-path)
-          (put reevaluating other-sym nil)))))
+          (reeval-with-tracking other-sym (fn [] (eval-in-file source other-env other-path)))))))
   # evaluate 1 source form in a protected manner
   (set eval1 (fn eval1-impl [source &opt l c]
     # check if this is a redefinition (before tracking the new def)
@@ -363,45 +366,13 @@
               (set redef? (not (nil? (get-in graph [:sources (get syms 0)])))))))))
     # track the definition
     (deps/track-definition graph source env path sess)
-    (var good true)
-    (var resumeval nil)
-    (def f
-      (fiber/new
-        (fn []
-          (array/clear lints)
-          (def res (compile source env where lints))
-          (unless (empty? lints)
-            # Convert lint levels to numbers.
-            (def levels (get env *lint-levels* lint-levels))
-            (def lint-error (get env *lint-error*))
-            (def lint-warning (get env *lint-warn*))
-            (def lint-error (or (get levels lint-error lint-error) 0))
-            (def lint-warning (or (get levels lint-warning lint-warning) 2))
-            (each [level line col msg] lints
-              (def lvl (get lint-levels level 0))
-              (cond
-                (<= lvl lint-error) (do
-                                      (set good false)
-                                      (on-compile-error msg nil where (or line l) (or col c)))
-                (<= lvl lint-warning) (on-compile-warning msg level where (or line l) (or col c)))))
-          (when good
-            (if (= (type res) :function)
-              (evaluator res source env where)
-              (do
-                (set good false)
-                (def {:error err :line line :column column :fiber errf} res)
-                (on-compile-error err errf where (or line l) (or column c))))))
-        guard
-        eval1-env))
-    (while (fiber/can-resume? f)
-      (def res (resume f resumeval))
-      (when good
-        (set resumeval (on-status f res where l c))))
+    # compile and evaluate
+    (def good (compile-and-eval source env eval1-env where l c))
     # after successful evaluation, re-evaluate dependents if this was a
     # redefinition but only at the top level (nested calls are already handled
     # by the outer cascade)
     (when (and good redef? defined-sym (empty? reevaluating))
-      (reevaluate-depnts defined-sym))))
+      (reeval-depents defined-sym))))
   # handle parser error in the correct environment
   (defn parse-err [p where]
     (def f (coro
