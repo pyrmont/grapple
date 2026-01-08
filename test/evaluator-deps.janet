@@ -1728,8 +1728,11 @@
   (def expect-4 (cross-msg env2-path "result"))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
-  (def expect-5 (err-msg `"not-a-function" expects 1 argument, got 2` :path env2-path))
   (def actual-5 (parser/produce p))
+  (def expect-5 (err-msg `compile error: "not-a-function" expects 1 argument, got 2`
+                         :path env2-path
+                         :line (actual-5 "janet/line")
+                         :col (actual-5 "janet/col")))
   (is (== expect-5 actual-5))
   (def expect-6 (cross-msg env3-path "final"))
   (def actual-6 (parser/produce p))

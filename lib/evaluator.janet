@@ -179,81 +179,6 @@
 
 # Public functions
 
-(defn cross-reeval
-  [path sess req send]
-  (def graph (get-in sess [:dep-graph path]))
-  (def source-env (module/cache path))
-  # no dependency graph and source environment so return early
-  (unless (and graph source-env)
-    (break))
-  # Collect all symbols in this file that have cross-file importers
-  (def symbols-with-importers @[])
-  (eachp [sym import-list] (get graph :importers)
-    (unless (empty? import-list)
-      (array/push symbols-with-importers sym)))
-  # Collect all affected nodes across all files
-  (def all-affected @[])
-  (each sym symbols-with-importers
-    (def affected (collect-affected-nodes path sym sess))
-    (array/concat all-affected affected))
-  # Remove duplicates
-  (def dist-affected (distinct all-affected))
-  # If nothing to re-evaluate, return early
-  (when (empty? dist-affected)
-    (break))
-  # Create senders
-  (def send-err (util/make-send-err req send))
-  (def send-note (util/make-send-note req send))
-  (def send-ret (util/make-send-ret req send))
-  # Topologically sort all affected nodes
-  (def ordered (deps/topological-sort dist-affected sess))
-  # Track which files we've sent notifications for
-  (def notified-files @{})
-  # Re-evaluate in topological order, sending note before first symbol in each file
-  (each [other-path other-sym] ordered
-    # Send notification for this file if we haven't yet
-    (unless (in notified-files other-path)
-      (put notified-files other-path true)
-      # Collect all symbols from this file that will be re-evaluated
-      (def file-syms (filter (fn [[p s]] (= p other-path)) ordered))
-      (def sym-names (map (fn [[p s]] s) file-syms))
-      (def dep-names (string/join (map string sym-names) ", "))
-      (send-note (string "Re-evaluating in " other-path ": " dep-names)))
-    # Re-evaluate this symbol
-    (def other-graph (get-in sess [:dep-graph other-path]))
-    (def other-env (module/cache other-path))
-    (when (and other-graph other-env)
-      # Update imported bindings before re-evaluating
-      (def deps (get-in other-graph [:deps other-sym] @[]))
-      (each dep deps
-        # Check if this dependency is imported from another file
-        (def binding (get other-env dep))
-        (when binding
-          (def source-map (get binding :source-map))
-          (when (and (tuple? source-map) (not= (get source-map 0) other-path))
-            (def dep-path (get source-map 0))
-            (def dep-env (module/cache dep-path))
-            (when dep-env
-              # Find and update the binding
-              (eachp [source-sym source-binding] dep-env
-                (when (= (get source-binding :source-map) source-map)
-                  (put other-env dep source-binding)
-                  (break)))))))
-      # Re-evaluate the symbol
-      (when (def source (get-in other-graph [:sources other-sym :form]))
-        (def compiled (compile source other-env other-path))
-        (if (function? compiled)
-          # Evaluate and send return message
-          (do
-            (def [ok? result] (protect (compiled)))
-            (if ok?
-              (send-ret (string/format "%q" result) {"done" false
-                                                     "janet/path" other-path
-                                                     "janet/reeval?" true})
-              (send-err result {"janet/path" other-path})))
-          # Compilation failed
-          (send-err (get compiled :error) {"janet/path" other-path}))))))
-
 (defn eval-make-env [&opt parent]
   (default parent eval-root-env)
   (def env (make-env parent)))
@@ -310,6 +235,45 @@
           g)))
   # forward declaration for mutual recursion
   (var eval1 nil)
+  (def lints @[])
+  # helper to evaluate source in a different file's environment
+  # but with the same fiber context (output, errors, etc.)
+  (defn eval-in-file [source target-env target-path &opt l c]
+    (def target-eval-env (module-make-env target-env true))
+    (put target-eval-env :current-file target-path)
+    (var good true)
+    (var resumeval nil)
+    (def f
+      (fiber/new
+        (fn []
+          (array/clear lints)
+          (def res (compile source target-env target-path lints))
+          (unless (empty? lints)
+            (def levels (get target-env *lint-levels* lint-levels))
+            (def lint-error (get target-env *lint-error*))
+            (def lint-warning (get target-env *lint-warn*))
+            (def lint-error (or (get levels lint-error lint-error) 0))
+            (def lint-warning (or (get levels lint-warning lint-warning) 2))
+            (each [level line col msg] lints
+              (def lvl (get lint-levels level 0))
+              (cond
+                (<= lvl lint-error) (do
+                                      (set good false)
+                                      (on-compile-error msg nil target-path (or line l) (or col c)))
+                (<= lvl lint-warning) (on-compile-warning msg level target-path (or line l) (or col c)))))
+          (when good
+            (if (= (type res) :function)
+              (evaluator res source target-env target-path)
+              (do
+                (set good false)
+                (def {:error err :line line :column column :fiber errf} res)
+                (on-compile-error err errf target-path (or line l) (or column c))))))
+        guard
+        target-eval-env))
+    (while (fiber/can-resume? f)
+      (def res (resume f resumeval))
+      (when good
+        (set resumeval (on-status f res target-path l c)))))
   (defn reevaluate-depnts [sym]
     (def graph (get-dep-graph path))
     (def to-reeval (deps/get-reeval-order path sym sess))
@@ -321,17 +285,61 @@
     (each dep to-reeval
       # skip if already being re-evaluated (prevents circular dependency loops)
       (unless (in reevaluating dep)
-        (put reevaluating dep true)
-        (def source (get-in graph [:sources dep :form]))
-        (when source
-          # re-evaluate using eval1
-          (eval1 source))
-        (put reevaluating dep nil)))
-    # Trigger cross-file re-evaluation after local dependents (only at top level)
-    (when (empty? reevaluating)
-      (cross-reeval path sess req send)))
+        (when (def source (get-in graph [:sources dep :form]))
+          (put reevaluating dep true)
+          (eval1 source)
+          (put reevaluating dep nil))))
+    # return early if already reevaluating
+    (unless (empty? reevaluating)
+      (break))
+    # Collect all affected nodes (including circular deps back to same file)
+    (def all-affected (collect-affected-nodes path sym sess))
+    # Filter out only the local deps we already handled above.
+    # Don't filter all same-file symbols - circular deps can return to same file!
+    (def cross-reeval (filter (fn [[p s]]
+                                (not (and (= p path) (has-value? to-reeval s))))
+                              all-affected))
+    # If nothing to re-evaluate, return early
+    (when (empty? cross-reeval)
+      (break))
+    # Topologically sort all affected nodes
+    (def ordered (deps/topological-sort cross-reeval sess))
+    # Track which files we've sent notifications for
+    (def notified-files @{})
+    # Re-evaluate in topological order, sending note before first symbol in each file
+    (each [other-path other-sym] ordered
+      # Send notification for this file if we haven't yet
+      (unless (in notified-files other-path)
+        (put notified-files other-path true)
+        # Collect all symbols from this file that will be re-evaluated
+        (def file-syms (filter (fn [[p s]] (= p other-path)) ordered))
+        (def sym-names (map (fn [[p s]] s) file-syms))
+        (def dep-names (string/join (map string sym-names) ", "))
+        (note (string "Re-evaluating in " other-path ": " dep-names)))
+      # Re-evaluate this symbol
+      (def other-graph (get-in sess [:dep-graph other-path]))
+      (def other-env (module/cache other-path))
+      (when (and other-graph other-env)
+        # Update imported bindings before re-evaluating
+        (each dep (get-in other-graph [:deps other-sym] @[])
+          # Check if this dependency is imported from another file
+          (when (def binding (get other-env dep))
+            (def source-map (get binding :source-map))
+            (when (and (tuple? source-map) (not= (get source-map 0) other-path))
+              (def dep-path (get source-map 0))
+              (when (def dep-env (module/cache dep-path))
+                # Find and update the binding
+                (each source-binding dep-env
+                  (when (= (get source-binding :source-map) source-map)
+                    (put other-env dep source-binding)
+                    (break)))))))
+        # Re-evaluate the symbol using the fiber-based evaluator
+        # Mark as being re-evaluated so reeval? flag is set correctly
+        (when (def source (get-in other-graph [:sources other-sym :form]))
+          (put reevaluating other-sym true)
+          (eval-in-file source other-env other-path)
+          (put reevaluating other-sym nil)))))
   # evaluate 1 source form in a protected manner
-  (def lints @[])
   (set eval1 (fn eval1-impl [source &opt l c]
     # check if this is a redefinition (before tracking the new def)
     (def graph (get-dep-graph path))

@@ -142,8 +142,6 @@
                      :send send
                      :req req
                      :sess sess))
-  # Trigger cross-file re-evaluation after reload
-  (eval/cross-reeval path sess req send)
   (send-ret res))
 
 (defn env-doc [req sns send-ret send-err]
