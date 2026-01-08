@@ -197,18 +197,16 @@
     (def affected (collect-affected-nodes path sym sess))
     (array/concat all-affected affected))
   # Remove duplicates
-  (def seen @{})
-  (def unique-affected @[])
-  (each [p s] all-affected
-    (def key (string p ":" s))
-    (unless (in seen key)
-      (put seen key true)
-      (array/push unique-affected [p s])))
+  (def dist-affected (distinct all-affected))
   # If nothing to re-evaluate, return early
-  (when (empty? unique-affected)
+  (when (empty? dist-affected)
     (break))
+  # Create senders
+  (def send-err (util/make-send-err req send))
+  (def send-note (util/make-send-note req send))
+  (def send-ret (util/make-send-ret req send))
   # Topologically sort all affected nodes
-  (def ordered (deps/topological-sort unique-affected sess))
+  (def ordered (deps/topological-sort dist-affected sess))
   # Track which files we've sent notifications for
   (def notified-files @{})
   # Re-evaluate in topological order, sending note before first symbol in each file
@@ -220,12 +218,7 @@
       (def file-syms (filter (fn [[p s]] (= p other-path)) ordered))
       (def sym-names (map (fn [[p s]] s) file-syms))
       (def dep-names (string/join (map string sym-names) ", "))
-      (send {"tag" "note"
-             "op" "env.eval"
-             "lang" util/lang
-             "req" (req "id")
-             "sess" (req "sess")
-             "val" (string "Re-evaluating in " other-path ": " dep-names)}))
+      (send-note (string "Re-evaluating in " other-path ": " dep-names)))
     # Re-evaluate this symbol
     (def other-graph (get-in sess [:dep-graph other-path]))
     (def other-env (module/cache other-path))
@@ -247,39 +240,19 @@
                   (put other-env dep source-binding)
                   (break)))))))
       # Re-evaluate the symbol
-      (def source (get-in other-graph [:sources other-sym :form]))
-      (when source
+      (when (def source (get-in other-graph [:sources other-sym :form]))
         (def compiled (compile source other-env other-path))
         (if (function? compiled)
           # Evaluate and send return message
           (do
             (def [ok? result] (protect (compiled)))
             (if ok?
-              (send {"tag" "ret"
-                     "op" "env.eval"
-                     "lang" util/lang
-                     "req" (req "id")
-                     "sess" (req "sess")
-                     "done" false
-                     "val" (string/format "%q" result)
-                     "janet/path" other-path
-                     "janet/reeval?" true})
-              (send {"tag" "err"
-                     "op" "env.eval"
-                     "lang" util/lang
-                     "req" (req "id")
-                     "sess" (req "sess")
-                     "val" result
-                     "janet/path" other-path})))
+              (send-ret (string/format "%q" result) {"done" false
+                                                     "janet/path" other-path
+                                                     "janet/reeval?" true})
+              (send-err result {"janet/path" other-path})))
           # Compilation failed
-          (let [{:error err} compiled]
-            (send {"tag" "err"
-                   "op" "env.eval"
-                   "lang" util/lang
-                   "req" (req "id")
-                   "sess" (req "sess")
-                   "val" err
-                   "janet/path" other-path})))))))
+          (send-err (get compiled :error) {"janet/path" other-path}))))))
 
 (defn eval-make-env [&opt parent]
   (default parent eval-root-env)
@@ -337,14 +310,13 @@
           g)))
   # forward declaration for mutual recursion
   (var eval1 nil)
-  (defn- reevaluate-depnts [sym]
-    "Re-evaluates all symbols that depend on sym"
+  (defn reevaluate-depnts [sym]
     (def graph (get-dep-graph path))
     (def to-reeval (deps/get-reeval-order path sym sess))
     # send informational message only at the top level (when not already reevaluating)
     (unless (or (empty? to-reeval) (not (empty? reevaluating)))
       (def dep-names (string/join (map string to-reeval) ", "))
-      (note (string "Re-evaluating dependents of " sym ": " dep-names) {}))
+      (note (string "Re-evaluating dependents of " sym ": " dep-names)))
     # re-evaluate each dependent using stored source
     (each dep to-reeval
       # skip if already being re-evaluated (prevents circular dependency loops)
