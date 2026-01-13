@@ -31,14 +31,8 @@ local function handle_sess_new(resp)
   local serv_ver = resp["janet/serv"][2]
   return log.append("info", {("Connected to " .. upcase(serv_name, 1) .. " v" .. serv_ver .. " running " .. upcase(impl_name, 1) .. " v" .. impl_ver .. " as session " .. resp.sess)})
 end
-local function handle_env_eval(resp, opts)
-  if (nil == resp.val) then
-    return nil
-  elseif (("out" == resp.tag) and ("out" == resp.ch)) then
-    return log.append("stdout", {resp.val})
-  elseif (("out" == resp.tag) and ("err" == resp.ch)) then
-    return log.append("stderr", {resp.val})
-  elseif (("note" == resp.tag) and ("breakpoints-orphaned" == resp.val)) then
+local function handle_cmd(resp)
+  if ("clear-breakpoints" == resp.val) then
     local bp_ids = resp["janet/breakpoints"]
     local breakpoints = state.get("breakpoints")
     local removed_locations = {}
@@ -56,15 +50,23 @@ local function handle_env_eval(resp, opts)
         end
       end
     end
-    if (#removed_locations > 0) then
-      log.append("note", {"Removed orphaned breakpoint(s):"})
-      for _, location in ipairs(removed_locations) do
-        log.append("note", {("  " .. location)})
-      end
-      return nil
-    else
-      return nil
+    for _, location in ipairs(removed_locations) do
+      log.append("debug", {("Removed stale breakpoint at " .. location)})
     end
+    return nil
+  else
+    return nil
+  end
+end
+local function handle_env_eval(resp, opts)
+  if (nil == resp.val) then
+    return nil
+  elseif (("out" == resp.tag) and ("out" == resp.ch)) then
+    return log.append("stdout", {resp.val})
+  elseif (("out" == resp.tag) and ("err" == resp.ch)) then
+    return log.append("stderr", {resp.val})
+  elseif ("cmd" == resp.tag) then
+    return handle_cmd(resp)
   elseif ("note" == resp.tag) then
     return log.append("note", {resp.val})
   elseif (("sig" == resp.tag) and ("debug" == resp.val)) then
@@ -157,7 +159,7 @@ end
 local function handle_dbg_brk_add(resp, opts)
   if ("ret" == resp.tag) then
     local bp_id = resp["janet/bp-id"]
-    log.append("debug", {("Breakpoint added at " .. opts["file-path"] .. ":" .. opts.line)})
+    log.append("debug", {("Added breakpoint at " .. opts["file-path"] .. ":" .. opts.line)})
     return ui["add-breakpoint-sign"](opts.bufnr, opts["file-path"], opts.line, bp_id)
   elseif ("err" == resp.tag) then
     return display_error(("Failed to add breakpoint: " .. resp.val), resp)
@@ -171,7 +173,7 @@ local function handle_dbg_brk_rem(resp, opts)
     local bp_data = breakpoints[opts["sign-id"]]
     local current_line = ui["get-sign-current-line"](opts["sign-id"])
     if (bp_data and current_line) then
-      log.append("debug", {("Breakpoint removed at " .. bp_data["file-path"] .. ":" .. current_line)})
+      log.append("debug", {("Removed breakpoint at " .. bp_data["file-path"] .. ":" .. current_line)})
     else
     end
     return ui["remove-breakpoint-sign"](opts["sign-id"])
@@ -183,7 +185,7 @@ local function handle_dbg_brk_rem(resp, opts)
 end
 local function handle_dbg_brk_clr(resp)
   if ("ret" == resp.tag) then
-    log.append("debug", {"All breakpoints cleared"})
+    log.append("debug", {"Cleared all breakpoints"})
     return ui["clear-breakpoint-signs"]()
   elseif ("err" == resp.tag) then
     return display_error(("Failed to clear breakpoints: " .. resp.val), resp)

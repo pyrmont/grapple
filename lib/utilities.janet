@@ -107,6 +107,23 @@
             # default
             (error "invalid argument: must be nil or dictionary")))))
 
+(defn make-send-cmd [req send]
+  (def {"op" op "id" id "sess" sess} req)
+  (fn :cmd-sender [val &opt details]
+    (def resp @{"tag" "cmd"
+                "op" op
+                "lang" lang
+                "req" id
+                "sess" sess
+                "val" val})
+    (send (cond
+            (nil? details)
+            resp
+            (dictionary? details)
+            (merge-into resp details)
+            # default
+            (error "invalid argument: must be nil or dictionary")))))
+
 (defn stack [f]
   (map (fn [fr] {:name (fr :name)
                  :path (fr :source)

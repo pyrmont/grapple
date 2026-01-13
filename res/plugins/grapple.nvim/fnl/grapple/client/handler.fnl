@@ -33,18 +33,9 @@
                      " v" impl-ver
                      " as session " resp.sess)])))
 
-(fn handle-env-eval [resp opts]
+(fn handle-cmd [resp]
   (if
-    (= nil resp.val)
-    nil ; do nothing if no value to print
-
-    (and (= "out" resp.tag) (= "out" resp.ch))
-    (log.append :stdout [resp.val])
-
-    (and (= "out" resp.tag) (= "err" resp.ch))
-    (log.append :stderr [resp.val])
-
-    (and (= "note" resp.tag) (= "breakpoints-orphaned" resp.val))
+    (= "clear-breakpoints" resp.val)
     (let [bp-ids (. resp "janet/breakpoints")
           breakpoints (state.get :breakpoints)
           removed-locations []]
@@ -57,10 +48,22 @@
                 (table.insert removed-locations (.. bp-data.file-path ":" current-line)))
               (ui.remove-breakpoint-sign sign-id)
               (lua "break")))))
-      (when (> (length removed-locations) 0)
-        (log.append :note ["Removed orphaned breakpoint(s):"])
-        (each [_ location (ipairs removed-locations)]
-          (log.append :note [(.. "  " location)]))))
+      (each [_ location (ipairs removed-locations)]
+        (log.append :debug [(.. "Removed stale breakpoint at " location)])))))
+
+(fn handle-env-eval [resp opts]
+  (if
+    (= nil resp.val)
+    nil ; do nothing if no value to print
+
+    (and (= "out" resp.tag) (= "out" resp.ch))
+    (log.append :stdout [resp.val])
+
+    (and (= "out" resp.tag) (= "err" resp.ch))
+    (log.append :stderr [resp.val])
+
+    (= "cmd" resp.tag)
+    (handle-cmd resp)
 
     (= "note" resp.tag)
     (log.append :note [resp.val])
@@ -143,7 +146,7 @@
     (= "ret" resp.tag)
     (do
       (let [bp-id (. resp "janet/bp-id")]
-        (log.append :debug [(.. "Breakpoint added at " opts.file-path ":" opts.line)])
+        (log.append :debug [(.. "Added breakpoint at " opts.file-path ":" opts.line)])
         (ui.add-breakpoint-sign opts.bufnr opts.file-path opts.line bp-id)))
     (= "err" resp.tag)
     (display-error (.. "Failed to add breakpoint: " resp.val) resp)))
@@ -156,7 +159,7 @@
             bp-data (. breakpoints opts.sign-id)
             current-line (ui.get-sign-current-line opts.sign-id)]
         (when (and bp-data current-line)
-          (log.append :debug [(.. "Breakpoint removed at " bp-data.file-path ":" current-line)]))
+          (log.append :debug [(.. "Removed breakpoint at " bp-data.file-path ":" current-line)]))
         (ui.remove-breakpoint-sign opts.sign-id)))
     (= "err" resp.tag)
     (display-error (.. "Failed to remove breakpoint: " resp.val) resp)))
@@ -165,7 +168,7 @@
   (if
     (= "ret" resp.tag)
     (do
-      (log.append :debug ["All breakpoints cleared"])
+      (log.append :debug ["Cleared all breakpoints"])
       (ui.clear-breakpoint-signs))
     (= "err" resp.tag)
     (display-error (.. "Failed to clear breakpoints: " resp.val) resp)))

@@ -352,16 +352,16 @@
                    "janet/reeval?" false})
   (def actual-ret (parser/produce p))
   (is (== expect-ret actual-ret))
-  # Second message should be the orphaned breakpoint notification
-  (def expect-note {"tag" "note"
-                    "op" "env.eval"
-                    "lang" u/lang
-                    "req" "1"
-                    "sess" "1"
-                    "val" "Breakpoints lost after re-evaluation"
-                    "janet/breakpoints" [bp-id]})
-  (def actual-note (parser/produce p))
-  (is (== expect-note actual-note))
+  # Second message should be the orphaned breakpoint command
+  (def expect-cmd {"tag" "cmd"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "val" "clear-breakpoints"
+                   "janet/breakpoints" [bp-id]})
+  (def actual-cmd (parser/produce p))
+  (is (== expect-cmd actual-cmd))
   (is (not (parser/has-more p))))
 
 (run-tests!)

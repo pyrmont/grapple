@@ -199,6 +199,7 @@
   (unless (and env req send sess)
     (error "missing :env, :req, :send and :sess parameters"))
   (default path util/ns)
+  (def cmd (util/make-send-cmd req send))
   (def err (util/make-send-err req send))
   (def note (util/make-send-note req send))
   (def out-1 (util/make-send-out req send "out"))
@@ -382,7 +383,7 @@
     (when (and good defined-sym)
       (def bps (find-breakpoints sess path defined-sym))
       (unless (empty? bps)
-        (note "Breakpoints lost after re-evaluation" {"janet/breakpoints" bps}))
+        (cmd "clear-breakpoints" {"janet/breakpoints" bps}))
       # after successful evaluation, re-evaluate dependents if this was a
       # redefinition but only at the top level (nested calls are already handled
       # by the outer cascade)
