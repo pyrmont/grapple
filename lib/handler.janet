@@ -17,7 +17,7 @@
    "env.doc" {:req ["lang" "id" "sess" "sym" "ns"]}
    "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}
    "dbg.brk.add" {:req ["lang" "id" "sess" "path" "line"]}
-   "dbg.brk.rem" {:req ["lang" "id" "sess" "path" "line"]}
+   "dbg.brk.rem" {:req ["lang" "id" "sess" "bp-id"]}
    "dbg.brk.clr" {:req ["lang" "id" "sess"]}
    "dbg.step.cont" {:req ["lang" "id" "sess"]}
    "dbg.insp.stk" {:req ["lang" "id" "sess"]}})
@@ -44,7 +44,7 @@
   (put sessions :count count)
   (def sess-id (string count))
   (put (sessions :clients) sess-id @{:dep-graph @{}
-                                     :breakpoints @{}})
+                                     :breakpoints @[]})
   sess-id)
 
 # Handle functions
@@ -217,27 +217,29 @@
             (set max-line sm-line)
             (set binding-sym sym))))))
   # save breakpoint
-  (def bp-key (string path ":" line))
-  (put-in sess [:breakpoints bp-key]
-          {:path path
-           :line line
-           :col column
-           :binding binding-sym})
-  (send-ret nil {"janet/bp" bp-key}))
+  (def bp-info {:path path
+                :line line
+                :col column
+                :binding binding-sym})
+  (array/push (sess :breakpoints) bp-info)
+  (def bp-id (dec (length (sess :breakpoints))))
+  (send-ret nil {"janet/bp-id" bp-id}))
 
 (defn dbg-brk-rem [req sns send-ret send-err]
-  (def {"path" path
-        "line" line
+  (def {"bp-id" bp-id
         "sess" sess-id} req)
   (def sess (get-in sns [:clients sess-id]))
   (unless sess
     (send-err "invalid session")
     (break))
-  (def bp-key (string path ":" line))
-  (def column (get-in sess [:breakpoints bp-key :col] 1))
+  (def bp-info (get-in sess [:breakpoints bp-id]))
+  (unless bp-info
+    (send-err "invalid breakpoint id")
+    (break))
+  (def {:path path :line line :col column} bp-info)
   (debug/unbreak path line column)
-  (put-in sess [:breakpoints bp-key] nil)
-  (send-ret nil {"janet/bp" bp-key}))
+  (put-in sess [:breakpoints bp-id] nil)
+  (send-ret nil {"janet/bp-id" bp-id}))
 
 (defn dbg-brk-clr [req sns send-ret send-err]
   (def {"sess" sess-id} req)
@@ -248,8 +250,9 @@
   # Clear all breakpoints for this session
   (def breakpoints (sess :breakpoints))
   (each bp breakpoints
-    (debug/unbreak (bp :path) (bp :line) (bp :col)))
-  (table/clear breakpoints)
+    (when bp
+      (debug/unbreak (bp :path) (bp :line) (bp :col))))
+  (array/clear breakpoints)
   (send-ret nil))
 
 (defn dbg-step-cont [req sns send-ret send-err]

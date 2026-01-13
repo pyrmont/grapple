@@ -9,7 +9,7 @@
   (def sessions @{})
   (put sessions :count 1)
   (put sessions :clients @{"1" @{:dep-graph @{}
-                                  :breakpoints @{}}})
+                                 :breakpoints @[]}})
   sessions)
 
 (defn make-stream []
@@ -544,17 +544,17 @@
             sessions
             send)
   (def actual-1 (recv))
-  (def brk-key-1 (string test-path ":" 2))
+  (def bp-id-1 0)
   (def expect-1 {"tag" "ret"
                  "op" "dbg.brk.add"
                  "lang" u/lang
                  "req" "1"
                  "sess" "1"
                  "done" true
-                 "janet/bp" brk-key-1})
+                 "janet/bp-id" bp-id-1})
   (is (== expect-1 actual-1))
   (def sess (get-in sessions [:clients "1"]))
-  (def brk-info-1 (get-in sess [:breakpoints brk-key-1]))
+  (def brk-info-1 (get-in sess [:breakpoints bp-id-1]))
   (is (== {:path test-path :line 2 :col 3 :binding 'add-1} brk-info-1))
   # Test breakpoint in second function (multiply-2 at line 5)
   (h/handle {"op" "dbg.brk.add"
@@ -567,16 +567,16 @@
             sessions
             send)
   (def actual-2 (recv))
-  (def brk-key-2 (string test-path ":" 5))
+  (def bp-id-2 1)
   (def expect-2 {"tag" "ret"
                  "op" "dbg.brk.add"
                  "lang" u/lang
                  "req" "2"
                  "sess" "1"
                  "done" true
-                 "janet/bp" brk-key-2})
+                 "janet/bp-id" bp-id-2})
   (is (== expect-2 actual-2))
-  (def brk-info-2 (get-in sess [:breakpoints brk-key-2]))
+  (def brk-info-2 (get-in sess [:breakpoints bp-id-2]))
   (is (== {:path test-path :line 5 :col 3 :binding 'multiply-2} brk-info-2))
   # Test breakpoint in third function (subtract-3 at line 8)
   (h/handle {"op" "dbg.brk.add"
@@ -589,16 +589,16 @@
             sessions
             send)
   (def actual-3 (recv))
-  (def brk-key-3 (string test-path ":" 8))
+  (def bp-id-3 2)
   (def expect-3 {"tag" "ret"
                  "op" "dbg.brk.add"
                  "lang" u/lang
                  "req" "3"
                  "sess" "1"
                  "done" true
-                 "janet/bp" brk-key-3})
+                 "janet/bp-id" bp-id-3})
   (is (== expect-3 actual-3))
-  (def brk-info-3 (get-in sess [:breakpoints brk-key-3]))
+  (def brk-info-3 (get-in sess [:breakpoints bp-id-3]))
   (is (== {:path test-path :line 8 :col 3 :binding 'subtract-3} brk-info-3))
   (is (zero? (ev/count chan))))
 
@@ -606,7 +606,6 @@
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
   (def test-path "./res/test/handler-env-load.janet")
-  (def brk-key (string test-path ":" 2))
   # First load the file
   (h/handle {"op" "env.load"
              "lang" u/lang
@@ -628,13 +627,13 @@
             sessions
             send)
   (recv)  # Discard add response
+  (def bp-id 0)
   # Now remove it
   (h/handle {"op" "dbg.brk.rem"
              "lang" u/lang
              "id" "2"
              "sess" "1"
-             "path" test-path
-             "line" 2}
+             "bp-id" bp-id}
             sessions
             send)
   (def actual (recv))
@@ -644,25 +643,21 @@
                "req" "2"
                "sess" "1"
                "done" true
-               "janet/bp" brk-key})
+               "janet/bp-id" bp-id})
   (is (== expect actual))
   # Verify breakpoint was removed from session
-  (is (nil? (get-in sessions [:clients "1" :breakpoints brk-key])))
+  (is (nil? (get-in sessions [:clients "1" :breakpoints bp-id])))
   (is (zero? (ev/count chan))))
 
 (deftest dbg-brk-rem-nonexistent
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  # Use a file path that hasn't been compiled by any test
-  (def test-path "./nonexistent-file-for-test.janet")
-  # Try to remove a breakpoint on an uncompiled file
-  # This should fail because the file hasn't been compiled
+  # Try to remove a breakpoint with an invalid ID
   (h/handle {"op" "dbg.brk.rem"
              "lang" u/lang
              "id" "1"
              "sess" "1"
-             "path" test-path
-             "line" 2}
+             "bp-id" 999}
             sessions
             send)
   (def actual (recv))
@@ -671,11 +666,7 @@
                "lang" u/lang
                "req" "1"
                "sess" "1"
-               "val" "request failed: could not find breakpoint"
-               "janet/line" (get actual "janet/line")
-               "janet/col" (get actual "janet/col")
-               "janet/path" (get actual "janet/path")
-               "janet/stack" (get actual "janet/stack")})
+               "val" "invalid breakpoint id"})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 

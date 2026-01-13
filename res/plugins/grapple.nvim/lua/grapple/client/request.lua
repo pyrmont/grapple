@@ -48,7 +48,7 @@ local function dbg_brk_add(conn, opts)
   return conn.send({op = "dbg.brk.add", path = opts["file-path"], line = opts.line, col = (opts.col or 1)}, opts)
 end
 local function dbg_brk_rem(conn, opts)
-  return conn.send({op = "dbg.brk.rem", path = opts["file-path"], line = opts.line}, opts)
+  return conn.send({op = "dbg.brk.rem", ["bp-id"] = opts["bp-id"]}, opts)
 end
 local function dbg_brk_clr(conn, opts)
   return conn.send({op = "dbg.brk.clr"}, opts)

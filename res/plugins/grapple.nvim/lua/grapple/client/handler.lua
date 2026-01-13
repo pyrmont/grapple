@@ -38,6 +38,33 @@ local function handle_env_eval(resp, opts)
     return log.append("stdout", {resp.val})
   elseif (("out" == resp.tag) and ("err" == resp.ch)) then
     return log.append("stderr", {resp.val})
+  elseif (("note" == resp.tag) and ("breakpoints-orphaned" == resp.val)) then
+    local bp_ids = resp["janet/breakpoints"]
+    local breakpoints = state.get("breakpoints")
+    local removed_locations = {}
+    for _, bp_id in ipairs(bp_ids) do
+      for sign_id, bp_data in pairs(breakpoints) do
+        if (bp_data["bp-id"] == bp_id) then
+          local current_line = ui["get-sign-current-line"](sign_id)
+          if current_line then
+            table.insert(removed_locations, (bp_data["file-path"] .. ":" .. current_line))
+          else
+          end
+          ui["remove-breakpoint-sign"](sign_id)
+          break
+        else
+        end
+      end
+    end
+    if (#removed_locations > 0) then
+      log.append("note", {"Removed orphaned breakpoint(s):"})
+      for _, location in ipairs(removed_locations) do
+        log.append("note", {("  " .. location)})
+      end
+      return nil
+    else
+      return nil
+    end
   elseif ("note" == resp.tag) then
     return log.append("note", {resp.val})
   elseif (("sig" == resp.tag) and ("debug" == resp.val)) then
@@ -76,16 +103,16 @@ local function handle_env_doc(resp, action)
     local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _8_
+    local _11_
     if not resp["janet/sm"] then
-      _8_ = "\n"
+      _11_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _8_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _11_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _8_)
+    sm_info = (resp["janet/type"] .. "\n" .. _11_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -104,7 +131,7 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_win_set_option(win, "scrolloff", 0)
     vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
     vim.api.nvim_win_set_option(win, "breakindent", true)
-    local function _11_()
+    local function _14_()
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       else
@@ -112,7 +139,7 @@ local function handle_env_doc(resp, action)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _11_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _14_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -129,8 +156,9 @@ local function handle_env_doc(resp, action)
 end
 local function handle_dbg_brk_add(resp, opts)
   if ("ret" == resp.tag) then
-    log.append("debug", {("Breakpoint added: " .. resp["janet/bp"])})
-    return ui["add-breakpoint-sign"](opts.bufnr, opts["file-path"], opts.line)
+    local bp_id = resp["janet/bp-id"]
+    log.append("debug", {("Breakpoint added at " .. opts["file-path"] .. ":" .. opts.line)})
+    return ui["add-breakpoint-sign"](opts.bufnr, opts["file-path"], opts.line, bp_id)
   elseif ("err" == resp.tag) then
     return display_error(("Failed to add breakpoint: " .. resp.val), resp)
   else
@@ -139,8 +167,14 @@ local function handle_dbg_brk_add(resp, opts)
 end
 local function handle_dbg_brk_rem(resp, opts)
   if ("ret" == resp.tag) then
-    log.append("debug", {("Breakpoint removed: " .. resp["janet/bp"])})
-    return ui["remove-breakpoint-sign"](opts["file-path"], opts.line)
+    local breakpoints = state.get("breakpoints")
+    local bp_data = breakpoints[opts["sign-id"]]
+    local current_line = ui["get-sign-current-line"](opts["sign-id"])
+    if (bp_data and current_line) then
+      log.append("debug", {("Breakpoint removed at " .. bp_data["file-path"] .. ":" .. current_line)})
+    else
+    end
+    return ui["remove-breakpoint-sign"](opts["sign-id"])
   elseif ("err" == resp.tag) then
     return display_error(("Failed to remove breakpoint: " .. resp.val), resp)
   else

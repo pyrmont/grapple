@@ -29,10 +29,13 @@
               result))})
 
 (local mock-ui
-  {:add-breakpoint-sign (fn [bufnr file-path line]
-                          (table.insert ui-calls {:op "add" :bufnr bufnr :file-path file-path :line line}))
-   :remove-breakpoint-sign (fn [file-path line]
-                             (table.insert ui-calls {:op "remove" :file-path file-path :line line}))
+  {:add-breakpoint-sign (fn [bufnr file-path line bp-id]
+                          (table.insert ui-calls {:op "add" :bufnr bufnr :file-path file-path :line line :bp-id bp-id}))
+   :get-sign-current-line (fn [sign-id]
+                            ;; Return line 10 for test sign-id
+                            (if (= sign-id 123) 10 nil))
+   :remove-breakpoint-sign (fn [sign-id]
+                             (table.insert ui-calls {:op "remove" :sign-id sign-id}))
    :clear-breakpoint-signs (fn []
                              (table.insert ui-calls {:op "clear"}))
    :show-debug-indicators (fn [bufnr file-path line]
@@ -59,7 +62,11 @@
     (before_each
       (fn []
         (set log-calls [])
-        (set state-data {:conn {} :breakpoints {}})
+        (set state-data {:conn {}
+                         :breakpoints {123 {:bufnr 1
+                                            :file-path "./test.janet"
+                                            :line 10
+                                            :bp-id 0}}})
         (set editor-calls [])
         (set ui-calls [])))
 
@@ -140,7 +147,7 @@
       (fn []
         (let [msg {:op "dbg.brk.add"
                    :tag "ret"
-                   :janet/bp "./test.janet:10"}
+                   :janet/bp-id 0}
               opts {:bufnr 1
                     :file-path "./test.janet"
                     :line 10}]
@@ -149,21 +156,20 @@
           (assert.equals 1 (length log-calls))
           (assert.equals :debug (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
-            (assert.equals "Breakpoint added: ./test.janet:10" (. lines 1))))))
+            (assert.equals "Breakpoint added at ./test.janet:10" (. lines 1))))))
 
     (it "handles dbg.brk.rem response"
       (fn []
         (let [msg {:op "dbg.brk.rem"
                    :tag "ret"
-                   :janet/bp "./test.janet:10"}
-              opts {:file-path "./test.janet"
-                    :line 10}]
+                   :janet/bp-id 0}
+              opts {:sign-id 123}]
           (handler.handle-message msg opts)
           ;; Should log breakpoint removed to debug section
           (assert.equals 1 (length log-calls))
           (assert.equals :debug (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
-            (assert.equals "Breakpoint removed: ./test.janet:10" (. lines 1))))))
+            (assert.equals "Breakpoint removed at ./test.janet:10" (. lines 1))))))
 
     (it "handles dbg.brk.clr response"
       (fn []

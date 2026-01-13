@@ -271,39 +271,48 @@ end
 local function remove_breakpoint()
   local function _39_(conn)
     local bufnr = vim.api.nvim_get_current_buf()
-    local file_path = vim.api.nvim_buf_get_name(bufnr)
     local cursor = vim.api.nvim_win_get_cursor(0)
     local line = cursor[1]
-    return request["dbg-brk-rem"](conn, {["file-path"] = file_path, line = line})
+    local bp_data = ui["get-breakpoint-at-line"](bufnr, line)
+    if bp_data then
+      local signs = vim.fn.sign_getplaced(bufnr, {lnum = line, group = "grapple_breakpoints"})
+      local buf_signs = signs[1]
+      local sign_list = buf_signs.signs
+      local sign = sign_list[1]
+      local sign_id = sign.id
+      return request["dbg-brk-rem"](conn, {["bp-id"] = bp_data["bp-id"], ["sign-id"] = sign_id})
+    else
+      return log.append("error", {"No breakpoint at current line"})
+    end
   end
   return with_conn_or_warn(_39_, {})
 end
 local function clear_breakpoints()
-  local function _40_(conn)
+  local function _41_(conn)
     return request["dbg-brk-clr"](conn, {})
   end
-  return with_conn_or_warn(_40_, {})
+  return with_conn_or_warn(_41_, {})
 end
 local function on_filetype()
   ui["init-breakpoint-signs"]()
   ui["init-debug-sign"]()
-  local function _41_()
+  local function _42_()
     if connected_3f() then
       clear_breakpoints()
     else
     end
     return nil
   end
-  vim.api.nvim_create_autocmd("BufWritePost", {buffer = 0, callback = _41_, desc = "Clear all breakpoints after buffer write"})
+  vim.api.nvim_create_autocmd("BufWritePost", {buffer = 0, callback = _42_, desc = "Clear all breakpoints after buffer write"})
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _43_()
+  local function _44_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _43_, {desc = "Connect to a REPL"})
-  local function _44_()
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _44_, {desc = "Connect to a REPL"})
+  local function _45_()
     return start_server({})
   end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _44_, {desc = "Start the Grapple server"})
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _45_, {desc = "Start the Grapple server"})
   mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
   mapping.buf("JanetAddBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "add-breakpoint"}), add_breakpoint, {desc = "Add a breakpoint at the cursor"})
   mapping.buf("JanetRemoveBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "remove-breakpoint"}), remove_breakpoint, {desc = "Remove a breakpoint at the cursor"})
@@ -326,10 +335,10 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _46_(result)
+    local function _47_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _46_)
+    return n.assoc(opts, "on-result", _47_)
   else
     return opts
   end

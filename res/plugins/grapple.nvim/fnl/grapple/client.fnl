@@ -287,11 +287,18 @@
   (with-conn-or-warn
     (fn [conn]
       (let [bufnr (vim.api.nvim_get_current_buf)
-            file-path (vim.api.nvim_buf_get_name bufnr)
             cursor (vim.api.nvim_win_get_cursor 0)
-            line (. cursor 1)]
-        (request.dbg-brk-rem conn {:file-path file-path
-                                    :line line})))
+            line (. cursor 1)
+            bp-data (ui.get-breakpoint-at-line bufnr line)]
+        (if bp-data
+          (let [signs (vim.fn.sign_getplaced bufnr {:lnum line :group "grapple_breakpoints"})
+                buf-signs (. signs 1)
+                sign-list (. buf-signs :signs)
+                sign (. sign-list 1)
+                sign-id (. sign :id)]
+            (request.dbg-brk-rem conn {:bp-id bp-data.bp-id
+                                       :sign-id sign-id}))
+          (log.append :error ["No breakpoint at current line"]))))
     {}))
 
 (fn clear-breakpoints []

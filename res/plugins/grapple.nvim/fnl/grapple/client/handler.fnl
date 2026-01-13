@@ -44,6 +44,24 @@
     (and (= "out" resp.tag) (= "err" resp.ch))
     (log.append :stderr [resp.val])
 
+    (and (= "note" resp.tag) (= "breakpoints-orphaned" resp.val))
+    (let [bp-ids (. resp "janet/breakpoints")
+          breakpoints (state.get :breakpoints)
+          removed-locations []]
+      (each [_ bp-id (ipairs bp-ids)]
+        ; Find the sign-id for this bp-id
+        (each [sign-id bp-data (pairs breakpoints)]
+          (when (= bp-data.bp-id bp-id)
+            (let [current-line (ui.get-sign-current-line sign-id)]
+              (when current-line
+                (table.insert removed-locations (.. bp-data.file-path ":" current-line)))
+              (ui.remove-breakpoint-sign sign-id)
+              (lua "break")))))
+      (when (> (length removed-locations) 0)
+        (log.append :note ["Removed orphaned breakpoint(s):"])
+        (each [_ location (ipairs removed-locations)]
+          (log.append :note [(.. "  " location)]))))
+
     (= "note" resp.tag)
     (log.append :note [resp.val])
 
@@ -124,8 +142,9 @@
   (if
     (= "ret" resp.tag)
     (do
-      (log.append :debug [(.. "Breakpoint added: " (. resp "janet/bp"))])
-      (ui.add-breakpoint-sign opts.bufnr opts.file-path opts.line))
+      (let [bp-id (. resp "janet/bp-id")]
+        (log.append :debug [(.. "Breakpoint added at " opts.file-path ":" opts.line)])
+        (ui.add-breakpoint-sign opts.bufnr opts.file-path opts.line bp-id)))
     (= "err" resp.tag)
     (display-error (.. "Failed to add breakpoint: " resp.val) resp)))
 
@@ -133,8 +152,12 @@
   (if
     (= "ret" resp.tag)
     (do
-      (log.append :debug [(.. "Breakpoint removed: " (. resp "janet/bp"))])
-      (ui.remove-breakpoint-sign opts.file-path opts.line))
+      (let [breakpoints (state.get :breakpoints)
+            bp-data (. breakpoints opts.sign-id)
+            current-line (ui.get-sign-current-line opts.sign-id)]
+        (when (and bp-data current-line)
+          (log.append :debug [(.. "Breakpoint removed at " bp-data.file-path ":" current-line)]))
+        (ui.remove-breakpoint-sign opts.sign-id)))
     (= "err" resp.tag)
     (display-error (.. "Failed to remove breakpoint: " resp.val) resp)))
 

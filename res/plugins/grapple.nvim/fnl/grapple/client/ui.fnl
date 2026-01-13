@@ -9,25 +9,49 @@
      :linehl ""
      :numhl ""}))
 
-(fn add-breakpoint-sign [bufnr file-path line]
+(fn add-breakpoint-sign [bufnr file-path line bp-id]
   (let [sign-id (vim.fn.sign_place 0 "grapple_breakpoints" "GrappleBreakpoint" bufnr {:lnum line})
-        bp-key (.. file-path ":" line)
         breakpoints (state.get :breakpoints)]
-    (n.assoc breakpoints bp-key {:bufnr bufnr :line line :sign-id sign-id})
+    (n.assoc breakpoints sign-id {:bufnr bufnr :file-path file-path :line line :bp-id bp-id})
     sign-id))
 
-(fn remove-breakpoint-sign [file-path line]
-  (let [bp-key (.. file-path ":" line)
-        breakpoints (state.get :breakpoints)
-        bp-data (. breakpoints bp-key)]
+(fn get-breakpoint-at-line [bufnr line]
+  "Query signs at the given line and return breakpoint data if found"
+  (let [signs (vim.fn.sign_getplaced bufnr {:lnum line :group "grapple_breakpoints"})]
+    (when (and signs (> (length signs) 0))
+      (let [buf-signs (. signs 1)
+            sign-list (. buf-signs :signs)]
+        (when (and sign-list (> (length sign-list) 0))
+          (let [sign (. sign-list 1)
+                sign-id (. sign :id)
+                breakpoints (state.get :breakpoints)]
+            (. breakpoints sign-id)))))))
+
+(fn get-sign-current-line [sign-id]
+  "Get the current line number where this sign is placed"
+  (let [breakpoints (state.get :breakpoints)
+        bp-data (. breakpoints sign-id)]
     (when bp-data
-      (vim.fn.sign_unplace "grapple_breakpoints" {:id bp-data.sign-id :buffer bp-data.bufnr})
-      (n.assoc breakpoints bp-key nil))))
+      ; sign_getplaced returns [{bufnr: X, signs: [{id: Y, lnum: Z}]}] even for single sign
+      (let [result (vim.fn.sign_getplaced bp-data.bufnr {:id sign-id :group "grapple_breakpoints"})]
+        (when (and result (> (length result) 0))
+          (let [buf-info (. result 1)
+                signs (. buf-info :signs)]
+            (when (and signs (> (length signs) 0))
+              (let [sign (. signs 1)]
+                (. sign :lnum)))))))))
+
+(fn remove-breakpoint-sign [sign-id]
+  (let [breakpoints (state.get :breakpoints)
+        bp-data (. breakpoints sign-id)]
+    (when bp-data
+      (vim.fn.sign_unplace "grapple_breakpoints" {:id sign-id :buffer bp-data.bufnr})
+      (n.assoc breakpoints sign-id nil))))
 
 (fn clear-breakpoint-signs []
   (let [breakpoints (state.get :breakpoints)]
-    (each [bp-key bp-data (pairs breakpoints)]
-      (vim.fn.sign_unplace "grapple_breakpoints" {:id bp-data.sign-id :buffer bp-data.bufnr}))
+    (each [sign-id bp-data (pairs breakpoints)]
+      (vim.fn.sign_unplace "grapple_breakpoints" {:id sign-id :buffer bp-data.bufnr}))
     (n.assoc (state.get) :breakpoints {})))
 
 (fn init-debug-sign []
@@ -60,6 +84,8 @@
 
 {: init-breakpoint-signs
  : add-breakpoint-sign
+ : get-breakpoint-at-line
+ : get-sign-current-line
  : remove-breakpoint-sign
  : clear-breakpoint-signs
  : init-debug-sign

@@ -34,14 +34,15 @@
   (def sess @{:dep-graph @{}})
   (def test-path "test-breakpoint.janet")
   # First compile the function definition
-  (def [res1 fib1] (run-eval "(defn test-fn [x]\n  (def y (+ x 5))\n  y)"
-         :env env :send send :req req :path test-path :sess sess))
+  (def code1 "(defn test-fn [x]\n  (def y (+ x 5))\n  y)")
+  (def [res1 fib1]
+    (run-eval code1 :env env :send send :req req :path test-path :sess sess))
   # Now set a breakpoint at line 2 (after function is compiled)
   (buffer/clear outb)
   (debug/break test-path 2 3)
   # Run code that calls the function in a fiber (hits the breakpoint)
-  (def [res2 fib2] (run-eval "(test-fn 10)"
-         :env env :send send :req req :path test-path :sess sess))
+  (def code2 "(test-fn 10)")
+  (def [res2 fib2] (run-eval code2 :env env :send send :req req :path test-path :sess sess))
   # Verify it paused at the breakpoint
   (is (= :debug (fiber/status fib2)))
   # Parse and verify the signal message
@@ -88,14 +89,16 @@
   (def sess @{:dep-graph @{}})
   (def test-path "test-continue.janet")
   # First compile the function
-  (def [res1 fib1] (run-eval "(defn calc [x]\n  (def sum (+ x 5))\n  sum)"
-         :env env :send send :req req :path test-path :sess sess))
+  (def code1 "(defn calc [x]\n  (def sum (+ x 5))\n  sum)")
+  (def [res1 fib1]
+    (run-eval code1 :env env :send send :req req :path test-path :sess sess))
   # Set a breakpoint
   (buffer/clear outb)
   (debug/break test-path 2 3)
   # Run code that calls the function in a fiber
-  (def [res2 fib2] (run-eval "(calc 10)"
-         :env env :send send :req req :path test-path :sess sess))
+  (def code2 "(calc 10)")
+  (def [res2 fib2]
+    (run-eval code2 :env env :send send :req req :path test-path :sess sess))
   # Verify we're paused at a breakpoint
   (is (= :debug (fiber/status fib2)))
   # Parse and verify the signal message
@@ -142,15 +145,16 @@
   (def sess @{:dep-graph @{}})
   (def test-path "test-inspect.janet")
   # First compile the function
+  (def code1 "(defn compute [a b]\n  (def result (+ a b))\n  result)")
   (def [res1 fib1]
-    (run-eval "(defn compute [a b]\n  (def result (+ a b))\n  result)"
-         :env env :send send :req req :path test-path :sess sess))
+    (run-eval code1 :env env :send send :req req :path test-path :sess sess))
   # Set a breakpoint
   (buffer/clear outb)
   (debug/break test-path 2 3)
   # Run code that calls the function in a fiber
-  (def [res2 fib2] (run-eval "(compute 5 7)"
-         :env env :send send :req req :path test-path :sess sess))
+  (def code2 "(compute 5 7)")
+  (def [res2 fib2]
+    (run-eval code2 :env env :send send :req req :path test-path :sess sess))
   # Verify we're paused at a breakpoint
   (is (= :debug (fiber/status fib2)))
   # Parse and verify the signal message
@@ -310,5 +314,54 @@
   (is (not (parser/has-more p)))
   # Clean up
   (debug/unbreak test-path 1 1))
+
+(deftest debug-orphaned-breakpoint-notification
+  (def p (parser/new))
+  (def outb @"")
+  (def send (make-sender outb))
+  (def env (e/eval-make-env))
+  (def test-path "test-orphaned-bp.janet")
+  (def sess @{:dep-graph @{}
+              :breakpoints @[]})
+  # Define a function
+  (def code1 "(defn test-fn [x]\n  (+ x 5))")
+  (run-eval code1 :env env :send send :req req :path test-path :sess sess)
+  (buffer/clear outb)
+  # Manually add a breakpoint to the session (simulating what handler does)
+  (array/push (sess :breakpoints) {:path test-path
+                                   :line 2
+                                   :col 3
+                                   :binding 'test-fn})
+  (def bp-id 0)
+  # Redefine the function, which should orphan the breakpoint
+  (def code2 "(defn test-fn [x]\n  (+ x 10))")
+  (run-eval code2 :env env :send send :req req :path test-path :sess sess)
+  # Parse messages
+  (parser/consume p outb)
+  # First message should be the return from the redefinition
+  (def expect-ret {"tag" "ret"
+                   "op" "env.eval"
+                   "lang" u/lang
+                   "req" "1"
+                   "sess" "1"
+                   "done" false
+                   "val" "<function test-fn>"
+                   "janet/path" test-path
+                   "janet/line" 1
+                   "janet/col" 1
+                   "janet/reeval?" false})
+  (def actual-ret (parser/produce p))
+  (is (== expect-ret actual-ret))
+  # Second message should be the orphaned breakpoint notification
+  (def expect-note {"tag" "note"
+                    "op" "env.eval"
+                    "lang" u/lang
+                    "req" "1"
+                    "sess" "1"
+                    "val" "Breakpoints lost after re-evaluation"
+                    "janet/breakpoints" [bp-id]})
+  (def actual-note (parser/produce p))
+  (is (== expect-note actual-note))
+  (is (not (parser/has-more p))))
 
 (run-tests!)

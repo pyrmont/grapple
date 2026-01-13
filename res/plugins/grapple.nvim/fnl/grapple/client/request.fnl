@@ -67,10 +67,9 @@
              opts))
 
 (fn dbg-brk-rem [conn opts]
-  ; (log.append :debug [(.. "Removing breakpoint at " opts.file-path ":" opts.line)])
+  ; (log.append :debug [(.. "Removing breakpoint with ID: " opts.bp-id)])
   (conn.send {:op "dbg.brk.rem"
-              :path opts.file-path
-              :line opts.line}
+              :bp-id opts.bp-id}
              opts))
 
 (fn dbg-brk-clr [conn opts]

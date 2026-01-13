@@ -91,6 +91,17 @@
     (put new-env :err (fn :err [x] (error "tried to output")))
     new-env))
 
+(defn- find-breakpoints [sess path sym]
+  (def bp-ids @[])
+  (def breakpoints (get sess :breakpoints @[]))
+  (eachk i breakpoints
+    (def bp-info (get breakpoints i))
+    (when (and bp-info
+               (= (get bp-info :path) path)
+               (= (get bp-info :binding) sym))
+      (array/push bp-ids i)))
+  bp-ids)
+
 (defn- bad-compile [send-err]
   (fn :bad-compile [msg macrof where &opt line col]
     (def full-msg
@@ -368,11 +379,15 @@
     (deps/track-definition graph source env path sess)
     # compile and evaluate
     (def good (compile-and-eval source env eval1-env where l c))
-    # after successful evaluation, re-evaluate dependents if this was a
-    # redefinition but only at the top level (nested calls are already handled
-    # by the outer cascade)
-    (when (and good redef? defined-sym (empty? reevaluating))
-      (reeval-depents defined-sym))))
+    (when (and good defined-sym)
+      (def bps (find-breakpoints sess path defined-sym))
+      (unless (empty? bps)
+        (note "Breakpoints lost after re-evaluation" {"janet/breakpoints" bps}))
+      # after successful evaluation, re-evaluate dependents if this was a
+      # redefinition but only at the top level (nested calls are already handled
+      # by the outer cascade)
+      (when (and redef? (empty? reevaluating))
+        (reeval-depents defined-sym)))))
   # handle parser error in the correct environment
   (defn parse-err [p where]
     (def f (coro
