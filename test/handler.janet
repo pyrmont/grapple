@@ -742,4 +742,196 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
+(deftest dbg-brk-trigger
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # First load the file
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Add a breakpoint on line 2 (inside add-1 function)
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "line" 2
+             "col" 3}
+            sessions
+            send)
+  (recv)  # Discard add response
+  # Evaluate code that calls add-1
+  (h/handle {"op" "env.eval"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "ns" test-path
+             "code" "(add-1 5)"}
+            sessions
+            send)
+  # Should receive a signal message when breakpoint is hit
+  (def actual (recv))
+  (def expect {"tag" "sig"
+               "op" "env.eval"
+               "lang" u/lang
+               "req" "2"
+               "sess" "1"
+               "val" "debug"
+               "janet/path" test-path
+               "janet/line" 2
+               "janet/col" 3})
+  (is (== expect actual))
+  # Verify session has paused fiber
+  (def sess (get-in sessions [:clients "1"]))
+  (is (not (nil? (sess :paused))))
+  (is (not (nil? (get-in sess [:paused :fiber]))))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-step-cont-success
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # Load the file
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Add breakpoint on line 2
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "line" 2
+             "col" 3}
+            sessions
+            send)
+  (recv)  # Discard add response
+  # Evaluate code that hits breakpoint
+  (h/handle {"op" "env.eval"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "ns" test-path
+             "code" "(add-1 5)"}
+            sessions
+            send)
+  (recv)  # Discard debug signal
+  # Now continue execution
+  (h/handle {"op" "dbg.step.cont"
+             "lang" u/lang
+             "id" "3"
+             "sess" "1"}
+            sessions
+            send)
+  # Response 1: step.cont confirmation (sent immediately)
+  (def actual-cont (recv))
+  (def expect-cont {"tag" "ret"
+                    "op" "dbg.step.cont"
+                    "lang" u/lang
+                    "req" "3"
+                    "sess" "1"
+                    "done" true})
+  (is (== expect-cont actual-cont))
+  # Response 2: Original eval result with the value
+  (def actual-result (recv))
+  (def expect-result {"tag" "ret"
+                      "op" "env.eval"
+                      "lang" u/lang
+                      "req" "2"
+                      "sess" "1"
+                      "done" false
+                      "val" "6"
+                      "janet/path" test-path
+                      "janet/line" 1
+                      "janet/col" 1
+                      "janet/reeval?" false})
+  (is (== expect-result actual-result))
+  # Response 3: Original eval done confirmation
+  (def actual-eval-done (recv))
+  (def expect-eval-done {"tag" "ret"
+                         "op" "env.eval"
+                         "lang" u/lang
+                         "req" "2"
+                         "sess" "1"
+                         "done" true})
+  (is (== expect-eval-done actual-eval-done))
+  # Session should no longer have paused fiber
+  (def sess (get-in sessions [:clients "1"]))
+  (is (nil? (sess :paused)))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-insp-stk-success
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # Load the file
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Add breakpoint on line 2
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "line" 2
+             "col" 3}
+            sessions
+            send)
+  (recv)  # Discard add response
+  # Evaluate code that hits breakpoint
+  (h/handle {"op" "env.eval"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "ns" test-path
+             "code" "(add-1 5)"}
+            sessions
+            send)
+  (recv)  # Discard debug signal
+  # Inspect the stack
+  (h/handle {"op" "dbg.insp.stk"
+             "lang" u/lang
+             "id" "3"
+             "sess" "1"}
+            sessions
+            send)
+  (def actual (recv))
+  # Build expected response with actual stack data from the response
+  # since stack frame data is complex and dynamic
+  (def expect {"tag" "ret"
+               "op" "dbg.insp.stk"
+               "lang" u/lang
+               "req" "3"
+               "sess" "1"
+               "done" true
+               "val" (actual "val")})
+  (is (== expect actual))
+  # Verify stack data is non-empty string
+  (is (string? (actual "val")))
+  (is (not (empty? (actual "val"))))
+  # Session should still have paused fiber (inspecting doesn't unpause)
+  (def sess (get-in sessions [:clients "1"]))
+  (is (not (nil? (sess :paused))))
+  (is (zero? (ev/count chan))))
+
 (run-tests!)

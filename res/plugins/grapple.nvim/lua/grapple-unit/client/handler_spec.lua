@@ -146,7 +146,7 @@ local function _14_()
     assert.equals(1, #log_calls)
     assert.equals("debug", log_calls[1].sec)
     local lines = log_calls[1].lines
-    return assert.equals("Breakpoint added at ./test.janet:10", lines[1])
+    return assert.equals("Added breakpoint at ./test.janet:10", lines[1])
   end
   it("handles dbg.brk.add response", _23_)
   local function _24_()
@@ -156,7 +156,7 @@ local function _14_()
     assert.equals(1, #log_calls)
     assert.equals("debug", log_calls[1].sec)
     local lines = log_calls[1].lines
-    return assert.equals("Breakpoint removed at ./test.janet:10", lines[1])
+    return assert.equals("Removed breakpoint at ./test.janet:10", lines[1])
   end
   it("handles dbg.brk.rem response", _24_)
   local function _25_()
@@ -166,7 +166,7 @@ local function _14_()
     assert.equals(1, #log_calls)
     assert.equals("debug", log_calls[1].sec)
     local lines = log_calls[1].lines
-    return assert.equals("All breakpoints cleared", lines[1])
+    return assert.equals("Cleared all breakpoints", lines[1])
   end
   it("handles dbg.brk.clr response", _25_)
   local function _26_()

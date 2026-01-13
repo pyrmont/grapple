@@ -270,19 +270,20 @@
   (def orig-send (paused :send))
   (def orig-ret (util/make-send-ret orig-req orig-send))
   (def orig-err (util/make-send-err orig-req orig-send))
+  # Send confirmation of continue
+  (send-ret nil)
+  (put sess :paused nil)
   # Resume paused fiber
   (def result (resume (paused :fiber) :continue))
   (def status (fiber/status (paused :fiber)))
-  (unless (= status :debug)
-    (put sess :paused nil))
   # Handle based on fiber status
   (case status
     :dead
     (orig-ret result)
     :debug
-    nil
-    (orig-err (string "fiber status: " status)))
-  (send-ret nil))
+    (put sess :paused paused)
+    # default
+    (orig-err (string "fiber status: " status))))
 
 (defn dbg-insp-stk [req sns send-ret send-err]
   (def {"sess" sess-id} req)

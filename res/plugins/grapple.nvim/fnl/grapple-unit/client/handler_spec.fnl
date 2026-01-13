@@ -156,7 +156,7 @@
           (assert.equals 1 (length log-calls))
           (assert.equals :debug (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
-            (assert.equals "Breakpoint added at ./test.janet:10" (. lines 1))))))
+            (assert.equals "Added breakpoint at ./test.janet:10" (. lines 1))))))
 
     (it "handles dbg.brk.rem response"
       (fn []
@@ -169,7 +169,7 @@
           (assert.equals 1 (length log-calls))
           (assert.equals :debug (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
-            (assert.equals "Breakpoint removed at ./test.janet:10" (. lines 1))))))
+            (assert.equals "Removed breakpoint at ./test.janet:10" (. lines 1))))))
 
     (it "handles dbg.brk.clr response"
       (fn []
@@ -181,7 +181,7 @@
           (assert.equals 1 (length log-calls))
           (assert.equals :debug (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
-            (assert.equals "All breakpoints cleared" (. lines 1))))))
+            (assert.equals "Cleared all breakpoints" (. lines 1))))))
 
     (it "handles dbg.insp.stk response with stack frames"
       (fn []
