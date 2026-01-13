@@ -313,15 +313,6 @@
   (ui.init-breakpoint-signs)
   ; Initialize debug position sign
   (ui.init-debug-sign)
-  ; Set up autocmd to clear breakpoints on buffer write
-  ; This prevents breakpoints from being at wrong locations after edits
-  (vim.api.nvim_create_autocmd "BufWritePost"
-    {:buffer 0
-     :callback (fn []
-                 (when (connected?)
-                   (clear-breakpoints))
-                 nil)
-     :desc "Clear all breakpoints after buffer write"})
   (mapping.buf
     :JanetDisconnect
     (config.get-in [:client :janet :mrepl :mapping :disconnect])
