@@ -198,10 +198,31 @@
   (unless sess
     (send-err "invalid session")
     (break))
+  # set breakpoint
   (def column (or col 1))
   (debug/break path line column)
+  # find the binding that contains this line
+  (def env (module/cache path))
+  (var binding-sym nil)
+  (var max-line 0)
+  (when env
+    (eachp [sym binding] env
+      (when (and (table? binding) (binding :source-map))
+        (def sm (binding :source-map))
+        (when (tuple? sm)
+          (def [sm-path sm-line] sm)
+          (when (and (= sm-path path)
+                     (<= sm-line line)
+                     (> sm-line max-line))
+            (set max-line sm-line)
+            (set binding-sym sym))))))
+  # save breakpoint
   (def bp-key (string path ":" line))
-  (put-in sess [:breakpoints bp-key] {:path path :line line :col column})
+  (put-in sess [:breakpoints bp-key]
+          {:path path
+           :line line
+           :col column
+           :binding binding-sym})
   (send-ret nil {"janet/bp" bp-key}))
 
 (defn dbg-brk-rem [req sns send-ret send-err]

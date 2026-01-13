@@ -299,7 +299,7 @@
              "path" path}
             sessions
             send)
-  (def actual-1 (do (recv) (recv) (recv)))
+  (def actual-1 (do (recv) (recv) (recv) (recv) (recv)))
   (def expect-1 {"tag" "ret"
                  "op" "env.load"
                  "lang" u/lang
@@ -532,8 +532,8 @@
             sessions
             send)
   # Discard load responses
-  (recv) (recv) (recv)
-  # Now add breakpoint
+  (recv) (recv) (recv) (recv) (recv)
+  # Test breakpoint in first function (add-1 at line 1)
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
@@ -543,21 +543,63 @@
              "col" 3}
             sessions
             send)
-  (def actual (recv))
-  (def brk-key (string test-path ":" 2))
-  (def expect {"tag" "ret"
-               "op" "dbg.brk.add"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "done" true
-               "janet/bp" brk-key})
-  (is (== expect actual))
-  # Verify breakpoint was stored in session with correct metadata
+  (def actual-1 (recv))
+  (def brk-key-1 (string test-path ":" 2))
+  (def expect-1 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp" brk-key-1})
+  (is (== expect-1 actual-1))
   (def sess (get-in sessions [:clients "1"]))
-  (def brk-info (get-in sess [:breakpoints brk-key]))
-  (def expect-brk-info {:path test-path :line 2 :col 3})
-  (is (== expect-brk-info brk-info))
+  (def brk-info-1 (get-in sess [:breakpoints brk-key-1]))
+  (is (== {:path test-path :line 2 :col 3 :binding 'add-1} brk-info-1))
+  # Test breakpoint in second function (multiply-2 at line 5)
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "path" test-path
+             "line" 5
+             "col" 3}
+            sessions
+            send)
+  (def actual-2 (recv))
+  (def brk-key-2 (string test-path ":" 5))
+  (def expect-2 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "2"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp" brk-key-2})
+  (is (== expect-2 actual-2))
+  (def brk-info-2 (get-in sess [:breakpoints brk-key-2]))
+  (is (== {:path test-path :line 5 :col 3 :binding 'multiply-2} brk-info-2))
+  # Test breakpoint in third function (subtract-3 at line 8)
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "3"
+             "sess" "1"
+             "path" test-path
+             "line" 8
+             "col" 3}
+            sessions
+            send)
+  (def actual-3 (recv))
+  (def brk-key-3 (string test-path ":" 8))
+  (def expect-3 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "3"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp" brk-key-3})
+  (is (== expect-3 actual-3))
+  (def brk-info-3 (get-in sess [:breakpoints brk-key-3]))
+  (is (== {:path test-path :line 8 :col 3 :binding 'subtract-3} brk-info-3))
   (is (zero? (ev/count chan))))
 
 (deftest dbg-brk-rem-success
@@ -574,7 +616,7 @@
             sessions
             send)
   # Discard load responses
-  (recv) (recv) (recv)
+  (recv) (recv) (recv) (recv) (recv)
   # Add a breakpoint
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
@@ -650,7 +692,7 @@
             sessions
             send)
   # Discard load responses
-  (recv) (recv) (recv)
+  (recv) (recv) (recv) (recv) (recv)
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
