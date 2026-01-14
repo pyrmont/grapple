@@ -409,14 +409,15 @@
              "id" "1"
              "sess" "1"
              "path" "nonexistent.janet"
-             "line" 10
-             "col" 3}
+             "janet/rline" 10
+             "janet/rcol" 3
+             "janet/form" "(some-form)"}
             sessions
             send)
   (def actual (recv))
   # Should get an error for non-existent file
   (is (= "err" (actual "tag")))
-  (is (string/find "could not find breakpoint" (actual "val")))
+  (is (string/find "no matching form, evaluate root form before adding breakpoint" (actual "val")))
   # Verify breakpoint was NOT stored in session
   (def sess (get-in sessions [:clients "1"]))
   (is (nil? (get-in sess [:breakpoints "nonexistent.janet:10"])))
@@ -430,7 +431,9 @@
              "id" "1"
              "sess" "999"
              "path" "test.janet"
-             "line" 10}
+             "janet/rline" 10
+             "janet/rcol" 3
+             "janet/form" "(some-form)"}
             sessions
             send)
   (def actual (recv))
@@ -462,22 +465,241 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest dbg-step-cont-invalid-session
+(deftest dbg-brk-add-success
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "dbg.step.cont"
+  (def test-path "./res/test/handler-env-load.janet")
+  # First load the file so breakpoints can be set on it
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Test breakpoint in first function (add-1 at line 1, body at relative offset 1)
+  (def form-1 "(defn add-1 [x]\n  (+ x 1))")
+  (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
-             "sess" "999"}
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form-1}
+            sessions
+            send)
+  (def actual-1 (recv))
+  (def bp-id-1 0)
+  (def expect-1 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "1"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp-id" bp-id-1})
+  (is (== expect-1 actual-1))
+  (def sess (get-in sessions [:clients "1"]))
+  (def brk-info-1 (get-in sess [:breakpoints bp-id-1]))
+  (is (== {:path test-path :line 2 :col 3 :binding 'add-1} brk-info-1))
+  # Test breakpoint in second function (multiply-2 at line 4, body at relative offset 1)
+  (def form-2 "(defn multiply-2 [x]\n  (* x 2))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form-2}
+            sessions
+            send)
+  (def actual-2 (recv))
+  (def bp-id-2 1)
+  (def expect-2 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "2"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp-id" bp-id-2})
+  (is (== expect-2 actual-2))
+  (def brk-info-2 (get-in sess [:breakpoints bp-id-2]))
+  (is (== {:path test-path :line 5 :col 3 :binding 'multiply-2} brk-info-2))
+  # Test breakpoint in third function (subtract-3 at line 7, body at relative offset 1)
+  (def form-3 "(defn subtract-3 [x]\n  (- x 3))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "3"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form-3}
+            sessions
+            send)
+  (def actual-3 (recv))
+  (def bp-id-3 2)
+  (def expect-3 {"tag" "ret"
+                 "op" "dbg.brk.add"
+                 "lang" u/lang
+                 "req" "3"
+                 "sess" "1"
+                 "done" true
+                 "janet/bp-id" bp-id-3})
+  (is (== expect-3 actual-3))
+  (def brk-info-3 (get-in sess [:breakpoints bp-id-3]))
+  (is (== {:path test-path :line 8 :col 3 :binding 'subtract-3} brk-info-3))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-brk-add-with-matching-form
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # First load the file so forms are stored
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Test breakpoint with matching form content (relative offset 1)
+  (def matching-form "(defn add-1 [x]\n  (+ x 1))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" matching-form}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "dbg.brk.add"
+               "lang" u/lang
+               "req" "1"
+               "sess" "1"
+               "done" true
+               "janet/bp-id" 0})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-brk-add-with-mismatched-form
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # First load the file so forms are stored
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  # Test breakpoint with mismatched form content (different function body)
+  (def mismatched-form "(defn add-1 [x]\n  (+ x 2))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" mismatched-form}
             sessions
             send)
   (def actual (recv))
   (def expect {"tag" "err"
-               "op" "dbg.step.cont"
+               "op" "dbg.brk.add"
                "lang" u/lang
                "req" "1"
-               "sess" "999"
-               "val" "invalid session"})
+               "sess" "1"
+               "val" "no matching form, evaluate root form before adding breakpoint"})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-brk-clr-success
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (def test-path "./res/test/handler-env-load.janet")
+  # First load the file
+  (h/handle {"op" "env.load"
+             "lang" u/lang
+             "id" "0"
+             "sess" "1"
+             "path" test-path}
+            sessions
+            send)
+  # Discard load responses
+  (recv) (recv) (recv) (recv) (recv)
+  (def form "(defn add-1 [x]\n  (+ x 1))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form}
+            sessions
+            send)
+  (recv)  # Discard response
+  (def form-2 "(defn multiply-2 [x]\n  (* x 2))")
+  (h/handle {"op" "dbg.brk.add"
+             "lang" u/lang
+             "id" "2"
+             "sess" "1"
+             "path" test-path
+             "janet/rline" 1
+             "janet/rcol" 1
+             "janet/form" form-2}
+            sessions
+            send)
+  (recv)  # Discard response
+  (def breakpoints (get-in sessions [:clients "1" :breakpoints]))
+  (is (= 2 (length breakpoints)))
+  (h/handle {"op" "dbg.brk.clr"
+             "lang" u/lang
+             "id" "3"
+             "sess" "1"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "dbg.brk.clr"
+               "lang" u/lang
+               "req" "3"
+               "sess" "1"
+               "done" true})
+  (is (== expect actual))
+  (is (zero? (length breakpoints)))
+  (is (zero? (ev/count chan))))
+
+(deftest dbg-brk-clr-empty
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (h/handle {"op" "dbg.brk.clr"
+             "lang" u/lang
+             "id" "1"
+             "sess" "1"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "ret"
+               "op" "dbg.brk.clr"
+               "lang" u/lang
+               "req" "1"
+               "sess" "1"
+               "done" true})
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
@@ -519,11 +741,11 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest dbg-brk-add-success
+(deftest dbg-insp-stk-success
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
   (def test-path "./res/test/handler-env-load.janet")
-  # First load the file so breakpoints can be set on it
+  # Load the file
   (h/handle {"op" "env.load"
              "lang" u/lang
              "id" "0"
@@ -533,73 +755,53 @@
             send)
   # Discard load responses
   (recv) (recv) (recv) (recv) (recv)
-  # Test breakpoint in first function (add-1 at line 1)
+  # Add breakpoint on line 2
+  (def form "(defn add-1 [x]\n  (+ x 1))")
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
              "sess" "1"
              "path" test-path
-             "line" 2
-             "col" 3}
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form}
             sessions
             send)
-  (def actual-1 (recv))
-  (def bp-id-1 0)
-  (def expect-1 {"tag" "ret"
-                 "op" "dbg.brk.add"
-                 "lang" u/lang
-                 "req" "1"
-                 "sess" "1"
-                 "done" true
-                 "janet/bp-id" bp-id-1})
-  (is (== expect-1 actual-1))
-  (def sess (get-in sessions [:clients "1"]))
-  (def brk-info-1 (get-in sess [:breakpoints bp-id-1]))
-  (is (== {:path test-path :line 2 :col 3 :binding 'add-1} brk-info-1))
-  # Test breakpoint in second function (multiply-2 at line 5)
-  (h/handle {"op" "dbg.brk.add"
+  (recv)  # Discard add response
+  # Evaluate code that hits breakpoint
+  (h/handle {"op" "env.eval"
              "lang" u/lang
              "id" "2"
              "sess" "1"
-             "path" test-path
-             "line" 5
-             "col" 3}
+             "ns" test-path
+             "code" "(add-1 5)"}
             sessions
             send)
-  (def actual-2 (recv))
-  (def bp-id-2 1)
-  (def expect-2 {"tag" "ret"
-                 "op" "dbg.brk.add"
-                 "lang" u/lang
-                 "req" "2"
-                 "sess" "1"
-                 "done" true
-                 "janet/bp-id" bp-id-2})
-  (is (== expect-2 actual-2))
-  (def brk-info-2 (get-in sess [:breakpoints bp-id-2]))
-  (is (== {:path test-path :line 5 :col 3 :binding 'multiply-2} brk-info-2))
-  # Test breakpoint in third function (subtract-3 at line 8)
-  (h/handle {"op" "dbg.brk.add"
+  (recv)  # Discard debug signal
+  # Inspect the stack
+  (h/handle {"op" "dbg.insp.stk"
              "lang" u/lang
              "id" "3"
-             "sess" "1"
-             "path" test-path
-             "line" 8
-             "col" 3}
+             "sess" "1"}
             sessions
             send)
-  (def actual-3 (recv))
-  (def bp-id-3 2)
-  (def expect-3 {"tag" "ret"
-                 "op" "dbg.brk.add"
-                 "lang" u/lang
-                 "req" "3"
-                 "sess" "1"
-                 "done" true
-                 "janet/bp-id" bp-id-3})
-  (is (== expect-3 actual-3))
-  (def brk-info-3 (get-in sess [:breakpoints bp-id-3]))
-  (is (== {:path test-path :line 8 :col 3 :binding 'subtract-3} brk-info-3))
+  (def actual (recv))
+  # Build expected response with actual stack data from the response
+  # since stack frame data is complex and dynamic
+  (def expect {"tag" "ret"
+               "op" "dbg.insp.stk"
+               "lang" u/lang
+               "req" "3"
+               "sess" "1"
+               "done" true
+               "val" (actual "val")})
+  (is (== expect actual))
+  # Verify stack data is non-empty string
+  (is (string? (actual "val")))
+  (is (not (empty? (actual "val"))))
+  # Session should still have paused fiber (inspecting doesn't unpause)
+  (def sess (get-in sessions [:clients "1"]))
+  (is (not (nil? (sess :paused))))
   (is (zero? (ev/count chan))))
 
 (deftest dbg-brk-rem-success
@@ -617,13 +819,15 @@
   # Discard load responses
   (recv) (recv) (recv) (recv) (recv)
   # Add a breakpoint
+  (def form "(defn add-1 [x]\n  (+ x 1))")
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
              "sess" "1"
              "path" test-path
-             "line" 2
-             "col" 3}
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form}
             sessions
             send)
   (recv)  # Discard add response
@@ -670,78 +874,6 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest dbg-brk-clr-success
-  (def sessions (make-sessions))
-  (def [recv send chan] (make-stream))
-  (def test-path "./res/test/handler-env-load.janet")
-  # First load the file
-  (h/handle {"op" "env.load"
-             "lang" u/lang
-             "id" "0"
-             "sess" "1"
-             "path" test-path}
-            sessions
-            send)
-  # Discard load responses
-  (recv) (recv) (recv) (recv) (recv)
-  (h/handle {"op" "dbg.brk.add"
-             "lang" u/lang
-             "id" "1"
-             "sess" "1"
-             "path" test-path
-             "line" 2
-             "col" 3}
-            sessions
-            send)
-  (recv)  # Discard response
-  (h/handle {"op" "dbg.brk.add"
-             "lang" u/lang
-             "id" "2"
-             "sess" "1"
-             "path" test-path
-             "line" 4
-             "col" 1}
-            sessions
-            send)
-  (recv)  # Discard response
-  (def breakpoints (get-in sessions [:clients "1" :breakpoints]))
-  (is (= 2 (length breakpoints)))
-  (h/handle {"op" "dbg.brk.clr"
-             "lang" u/lang
-             "id" "3"
-             "sess" "1"}
-            sessions
-            send)
-  (def actual (recv))
-  (def expect {"tag" "ret"
-               "op" "dbg.brk.clr"
-               "lang" u/lang
-               "req" "3"
-               "sess" "1"
-               "done" true})
-  (is (== expect actual))
-  (is (zero? (length breakpoints)))
-  (is (zero? (ev/count chan))))
-
-(deftest dbg-brk-clr-empty
-  (def sessions (make-sessions))
-  (def [recv send chan] (make-stream))
-  (h/handle {"op" "dbg.brk.clr"
-             "lang" u/lang
-             "id" "1"
-             "sess" "1"}
-            sessions
-            send)
-  (def actual (recv))
-  (def expect {"tag" "ret"
-               "op" "dbg.brk.clr"
-               "lang" u/lang
-               "req" "1"
-               "sess" "1"
-               "done" true})
-  (is (== expect actual))
-  (is (zero? (ev/count chan))))
-
 (deftest dbg-brk-trigger
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
@@ -756,14 +888,16 @@
             send)
   # Discard load responses
   (recv) (recv) (recv) (recv) (recv)
-  # Add a breakpoint on line 2 (inside add-1 function)
+  # Add a breakpoint on line 2 (inside add-1 function, relative offset 1)
+  (def form "(defn add-1 [x]\n  (+ x 1))")
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
              "sess" "1"
              "path" test-path
-             "line" 2
-             "col" 3}
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form}
             sessions
             send)
   (recv)  # Discard add response
@@ -794,6 +928,25 @@
   (is (not (nil? (get-in sess [:paused :fiber]))))
   (is (zero? (ev/count chan))))
 
+(deftest dbg-step-cont-invalid-session
+  (def sessions (make-sessions))
+  (def [recv send chan] (make-stream))
+  (h/handle {"op" "dbg.step.cont"
+             "lang" u/lang
+             "id" "1"
+             "sess" "999"}
+            sessions
+            send)
+  (def actual (recv))
+  (def expect {"tag" "err"
+               "op" "dbg.step.cont"
+               "lang" u/lang
+               "req" "1"
+               "sess" "999"
+               "val" "invalid session"})
+  (is (== expect actual))
+  (is (zero? (ev/count chan))))
+
 (deftest dbg-step-cont-success
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
@@ -809,13 +962,15 @@
   # Discard load responses
   (recv) (recv) (recv) (recv) (recv)
   # Add breakpoint on line 2
+  (def form "(defn add-1 [x]\n  (+ x 1))")
   (h/handle {"op" "dbg.brk.add"
              "lang" u/lang
              "id" "1"
              "sess" "1"
              "path" test-path
-             "line" 2
-             "col" 3}
+             "janet/rline" 1
+             "janet/rcol" 3
+             "janet/form" form}
             sessions
             send)
   (recv)  # Discard add response
@@ -871,67 +1026,6 @@
   # Session should no longer have paused fiber
   (def sess (get-in sessions [:clients "1"]))
   (is (nil? (sess :paused)))
-  (is (zero? (ev/count chan))))
-
-(deftest dbg-insp-stk-success
-  (def sessions (make-sessions))
-  (def [recv send chan] (make-stream))
-  (def test-path "./res/test/handler-env-load.janet")
-  # Load the file
-  (h/handle {"op" "env.load"
-             "lang" u/lang
-             "id" "0"
-             "sess" "1"
-             "path" test-path}
-            sessions
-            send)
-  # Discard load responses
-  (recv) (recv) (recv) (recv) (recv)
-  # Add breakpoint on line 2
-  (h/handle {"op" "dbg.brk.add"
-             "lang" u/lang
-             "id" "1"
-             "sess" "1"
-             "path" test-path
-             "line" 2
-             "col" 3}
-            sessions
-            send)
-  (recv)  # Discard add response
-  # Evaluate code that hits breakpoint
-  (h/handle {"op" "env.eval"
-             "lang" u/lang
-             "id" "2"
-             "sess" "1"
-             "ns" test-path
-             "code" "(add-1 5)"}
-            sessions
-            send)
-  (recv)  # Discard debug signal
-  # Inspect the stack
-  (h/handle {"op" "dbg.insp.stk"
-             "lang" u/lang
-             "id" "3"
-             "sess" "1"}
-            sessions
-            send)
-  (def actual (recv))
-  # Build expected response with actual stack data from the response
-  # since stack frame data is complex and dynamic
-  (def expect {"tag" "ret"
-               "op" "dbg.insp.stk"
-               "lang" u/lang
-               "req" "3"
-               "sess" "1"
-               "done" true
-               "val" (actual "val")})
-  (is (== expect actual))
-  # Verify stack data is non-empty string
-  (is (string? (actual "val")))
-  (is (not (empty? (actual "val"))))
-  # Session should still have paused fiber (inspecting doesn't unpause)
-  (def sess (get-in sessions [:clients "1"]))
-  (is (not (nil? (sess :paused))))
   (is (zero? (ev/count chan))))
 
 (run-tests!)

@@ -16,7 +16,7 @@
    "env.stop" {:req ["lang" "id" "sess" "req"]}
    "env.doc" {:req ["lang" "id" "sess" "sym" "ns"]}
    "env.cmpl" {:req ["lang" "id" "sess" "sym" "ns"]}
-   "dbg.brk.add" {:req ["lang" "id" "sess" "path" "line"]}
+   "dbg.brk.add" {:req ["lang" "id" "sess" "path" "janet/form" "janet/rline" "janet/rcol"]}
    "dbg.brk.rem" {:req ["lang" "id" "sess" "bp-id"]}
    "dbg.brk.clr" {:req ["lang" "id" "sess"]}
    "dbg.step.cont" {:req ["lang" "id" "sess"]}
@@ -191,35 +191,43 @@
 
 (defn dbg-brk-add [req sns send-ret send-err]
   (def {"path" path
-        "line" line
-        "col" col
+        "janet/rline" rel-line
+        "janet/rcol" rel-col
+        "janet/form" client-form
         "sess" sess-id} req)
   (def sess (get-in sns [:clients sess-id]))
   (unless sess
     (send-err "invalid session")
     (break))
-  # set breakpoint
-  (def column (or col 1))
-  (debug/break path line column)
-  # find the binding that contains this line
-  (def env (module/cache path))
+  # parse the client form
+  (def parsed-client-form (parse client-form))
+  # get the dependency graph for this file
+  (def dep-graph (get-in sess [:dep-graph path] {:sources {}}))
+  # find binding by matching form content
   (var binding-sym nil)
-  (var max-line 0)
-  (when env
-    (eachp [sym binding] env
-      (when (and (table? binding) (binding :source-map))
-        (def sm (binding :source-map))
-        (when (tuple? sm)
-          (def [sm-path sm-line] sm)
-          (when (and (= sm-path path)
-                     (<= sm-line line)
-                     (> sm-line max-line))
-            (set max-line sm-line)
-            (set binding-sym sym))))))
+  (var eval-line nil)
+  (var eval-col nil)
+  (eachp [sym source-info] (dep-graph :sources)
+    (when (deep= (source-info :form) parsed-client-form)
+      (set binding-sym sym)
+      (set eval-line (source-info :line))
+      (set eval-col (source-info :col))
+      (break)))
+  (unless binding-sym
+    (send-err "no matching form, evaluate root form before adding breakpoint")
+    (break))
+  # calculate absolute coordinates
+  (def abs-line (+ eval-line rel-line))
+  # If on the same line as form start, add to eval-col; otherwise use rel-col as-is
+  (def abs-col (if (zero? rel-line)
+                 (+ eval-col (or rel-col 0))
+                 (or rel-col 0)))
+  # set breakpoint
+  (debug/break path abs-line abs-col)
   # save breakpoint
   (def bp-info {:path path
-                :line line
-                :col column
+                :line abs-line
+                :col abs-col
                 :binding binding-sym})
   (array/push (sess :breakpoints) bp-info)
   (def bp-id (dec (length (sess :breakpoints))))

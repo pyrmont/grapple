@@ -62,8 +62,9 @@
   ; (log.append :debug [(.. "Setting breakpoint at " opts.file-path ":" opts.line)])
   (conn.send {:op "dbg.brk.add"
               :path opts.file-path
-              :line opts.line
-              :col (or opts.col 1)}
+              :janet/rline opts.line
+              :janet/rcol opts.col
+              :janet/form opts.form}
              opts))
 
 (fn dbg-brk-rem [conn opts]

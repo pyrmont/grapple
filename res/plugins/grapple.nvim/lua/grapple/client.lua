@@ -2,6 +2,7 @@
 local _local_1_ = require("conjure.nfnl.module")
 local autoload = _local_1_.autoload
 local config = autoload("conjure.config")
+local extract = autoload("conjure.extract")
 local handler = autoload("grapple.client.handler")
 local log = autoload("grapple.client.log")
 local mapping = autoload("conjure.mapping")
@@ -250,26 +251,42 @@ local function add_breakpoint()
     local bufnr = vim.api.nvim_get_current_buf()
     local file_path = vim.api.nvim_buf_get_name(bufnr)
     local cursor = vim.api.nvim_win_get_cursor(0)
-    local line = cursor[1]
-    local col = cursor[2]
-    return request["dbg-brk-add"](conn, {["file-path"] = file_path, line = line, col = (col + 1), bufnr = bufnr})
+    local cursor_line = cursor[1]
+    local cursor_col = cursor[2]
+    local root_form = extract.form({["root?"] = true})
+    if root_form then
+      local form_content = root_form.content
+      local form_range = root_form.range
+      local form_start_line = (form_range[1] + 1)
+      local form_start_col = form_range[2]
+      local rel_line = (cursor_line - form_start_line)
+      local rel_col
+      if (cursor_line == form_start_line) then
+        rel_col = (cursor_col - form_start_col)
+      else
+        rel_col = cursor_col
+      end
+      return request["dbg-brk-add"](conn, {["file-path"] = file_path, line = rel_line, col = rel_col, bufnr = bufnr, form = form_content})
+    else
+      return log.append("error", {"Cursor not in a root form"})
+    end
   end
   return with_conn_or_warn(_36_, {})
 end
 local function continue_execution()
-  local function _37_(conn)
+  local function _39_(conn)
     return request["dbg-step-cont"](conn, {})
   end
-  return with_conn_or_warn(_37_, {})
+  return with_conn_or_warn(_39_, {})
 end
 local function inspect_stack()
-  local function _38_(conn)
+  local function _40_(conn)
     return request["dbg-insp-stk"](conn, {})
   end
-  return with_conn_or_warn(_38_, {})
+  return with_conn_or_warn(_40_, {})
 end
 local function remove_breakpoint()
-  local function _39_(conn)
+  local function _41_(conn)
     local bufnr = vim.api.nvim_get_current_buf()
     local cursor = vim.api.nvim_win_get_cursor(0)
     local line = cursor[1]
@@ -285,26 +302,26 @@ local function remove_breakpoint()
       return log.append("error", {"No breakpoint at current line"})
     end
   end
-  return with_conn_or_warn(_39_, {})
+  return with_conn_or_warn(_41_, {})
 end
 local function clear_breakpoints()
-  local function _41_(conn)
+  local function _43_(conn)
     return request["dbg-brk-clr"](conn, {})
   end
-  return with_conn_or_warn(_41_, {})
+  return with_conn_or_warn(_43_, {})
 end
 local function on_filetype()
   ui["init-breakpoint-signs"]()
   ui["init-debug-sign"]()
   mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _42_()
+  local function _44_()
     return connect()
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _42_, {desc = "Connect to a REPL"})
-  local function _43_()
+  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _44_, {desc = "Connect to a REPL"})
+  local function _45_()
     return start_server({})
   end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _43_, {desc = "Start the Grapple server"})
+  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _45_, {desc = "Start the Grapple server"})
   mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
   mapping.buf("JanetAddBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "add-breakpoint"}), add_breakpoint, {desc = "Add a breakpoint at the cursor"})
   mapping.buf("JanetRemoveBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "remove-breakpoint"}), remove_breakpoint, {desc = "Remove a breakpoint at the cursor"})
@@ -327,10 +344,10 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _45_(result)
+    local function _47_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _45_)
+    return n.assoc(opts, "on-result", _47_)
   else
     return opts
   end

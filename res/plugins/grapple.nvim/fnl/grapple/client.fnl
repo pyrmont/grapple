@@ -1,5 +1,6 @@
 (local {: autoload} (require :conjure.nfnl.module))
 (local config (autoload :conjure.config))
+(local extract (autoload :conjure.extract))
 (local handler (autoload :grapple.client.handler))
 (local log (autoload :grapple.client.log))
 (local mapping (autoload :conjure.mapping))
@@ -262,12 +263,26 @@
       (let [bufnr (vim.api.nvim_get_current_buf)
             file-path (vim.api.nvim_buf_get_name bufnr)
             cursor (vim.api.nvim_win_get_cursor 0)
-            line (. cursor 1)
-            col (. cursor 2)]
-        (request.dbg-brk-add conn {:file-path file-path
-                                   :line line
-                                   :col (+ col 1)
-                                   :bufnr bufnr})))
+            cursor-line (. cursor 1)
+            cursor-col (. cursor 2)
+            root-form (extract.form {:root? true})]
+        (if root-form
+          (let [form-content root-form.content
+                ; Get root form start position from the range
+                form-range root-form.range
+                form-start-line (+ (. form-range 1) 1)  ; Convert 0-indexed to 1-indexed
+                form-start-col (. form-range 2)
+                ; Calculate relative offset
+                rel-line (- cursor-line form-start-line)
+                rel-col (if (= cursor-line form-start-line)
+                          (- cursor-col form-start-col)
+                          cursor-col)]
+            (request.dbg-brk-add conn {:file-path file-path
+                                       :line rel-line
+                                       :col rel-col
+                                       :bufnr bufnr
+                                       :form form-content}))
+          (log.append :error ["Cursor not in a root form"]))))
     {}))
 
 (fn continue-execution []

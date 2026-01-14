@@ -45,7 +45,7 @@ local function env_cmpl(conn, opts)
   return conn.send({op = "env.cmpl", ns = opts["file-path"], sym = opts.code}, opts)
 end
 local function dbg_brk_add(conn, opts)
-  return conn.send({op = "dbg.brk.add", path = opts["file-path"], line = opts.line, col = (opts.col or 1)}, opts)
+  return conn.send({op = "dbg.brk.add", path = opts["file-path"], ["janet/rline"] = opts.line, ["janet/rcol"] = opts.col, ["janet/form"] = opts.form}, opts)
 end
 local function dbg_brk_rem(conn, opts)
   return conn.send({op = "dbg.brk.rem", ["bp-id"] = opts["bp-id"]}, opts)
