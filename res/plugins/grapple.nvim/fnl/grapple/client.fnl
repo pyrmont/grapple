@@ -10,6 +10,7 @@
 (local state (autoload :grapple.client.state))
 (local ts (autoload :conjure.tree-sitter))
 (local ui (autoload :grapple.client.ui))
+(local debugger (autoload :grapple.client.debugger))
 
 (local buf-suffix ".janet")
 (local comment-prefix "# ")
@@ -34,11 +35,11 @@
                   :disconnect "cd"
                   :start-server "cs"
                   :stop-server "cS"
-                  :add-breakpoint "dba"
-                  :remove-breakpoint "dbr"
-                  :clear-breakpoints "dbc"
-                  :continue "dsc"
-                  :inspect-stack "dis"}}}}}))
+                  :add-breakpoint "ba"
+                  :remove-breakpoint "br"
+                  :clear-breakpoints "bc"
+                  :debug-continue "dc"
+                  :debug-step "ds"}}}}}))
 
 (fn process-alive? [job-id]
   (let [result (vim.fn.jobwait [job-id] 0)]
@@ -236,7 +237,14 @@
 (fn eval-str [opts]
   (with-conn-or-warn
     (fn [conn]
-      (request.env-eval conn opts))
+      ; Check if we're evaluating from the debugger input buffer
+      (let [current-buf (vim.api.nvim_get_current_buf)]
+        (if (debugger.is-input-buffer? current-buf)
+          ; Evaluate in debugger context using env.dbg
+          (request.env-dbg conn {:code opts.code
+                                 :req (debugger.get-debug-req)})
+          ; Normal evaluation
+          (request.env-eval conn opts))))
     opts))
 
 (fn eval-file [opts]
@@ -270,33 +278,23 @@
           (let [form-content root-form.content
                 ; Get root form start position from the range
                 form-range root-form.range
-                form-start-line (+ (. form-range 1) 1)  ; Convert 0-indexed to 1-indexed
-                form-start-col (. form-range 2)
+                form-start-line (n.get-in form-range [:start 1])  ; Already 1-indexed
+                form-start-col (n.get-in form-range [:start 2])
                 ; Calculate relative offset
                 rel-line (- cursor-line form-start-line)
+                ; Neovim cursor-col is 0-indexed, need to convert to 1-indexed for Janet
                 rel-col (if (= cursor-line form-start-line)
                           (- cursor-col form-start-col)
-                          cursor-col)]
-            (request.dbg-brk-add conn {:file-path file-path
-                                       :line rel-line
-                                       :col rel-col
+                          (+ cursor-col 1))]
+            (request.brk-add conn {:file-path file-path
+                                       :rline rel-line
+                                       :rcol rel-col
+                                       :line cursor-line
+                                       :col cursor-col
                                        :bufnr bufnr
                                        :form form-content}))
           (log.append :error ["Cursor not in a root form"]))))
     {}))
-
-(fn continue-execution []
-  (with-conn-or-warn
-    (fn [conn]
-      (request.dbg-step-cont conn {}))
-    {}))
-
-(fn inspect-stack []
-  (with-conn-or-warn
-    (fn [conn]
-      (request.dbg-insp-stk conn {}))
-    {}))
-
 
 (fn remove-breakpoint []
   (with-conn-or-warn
@@ -311,7 +309,7 @@
                 sign-list (. buf-signs :signs)
                 sign (. sign-list 1)
                 sign-id (. sign :id)]
-            (request.dbg-brk-rem conn {:bp-id bp-data.bp-id
+            (request.brk-rem conn {:bp-id bp-data.bp-id
                                        :sign-id sign-id}))
           (log.append :error ["No breakpoint at current line"]))))
     {}))
@@ -319,60 +317,97 @@
 (fn clear-breakpoints []
   (with-conn-or-warn
     (fn [conn]
-      (request.dbg-brk-clr conn {}))
+      (request.brk-clr conn {}))
     {}))
 
+(fn clear-breakpoints-in-form []
+  "Clear breakpoints in the current root form when text changes."
+  (let [root-form (extract.form {:root? true})]
+    (when root-form
+      (let [form-range root-form.range
+            form-start-line (n.get-in form-range [:start 1])
+            form-end-line (n.get-in form-range [:end 1])
+            bufnr (vim.api.nvim_get_current_buf)
+            signs (vim.fn.sign_getplaced bufnr {:group "grapple_breakpoints"})
+            buf-signs (when (> (length signs) 0) (. signs 1))
+            sign-list (when buf-signs (. buf-signs :signs))]
+        ; For each sign, check if it's in the form range
+        (when sign-list
+          (each [_ sign (ipairs sign-list)]
+            (when (and (>= sign.lnum form-start-line)
+                       (<= sign.lnum form-end-line))
+              ; Get breakpoint info from state and remove
+              (let [sign-id sign.id
+                    breakpoints (state.get :breakpoints)
+                    bp-info (when breakpoints (. breakpoints sign-id))]
+                (when bp-info
+                  (with-conn-or-warn
+                    (fn [conn]
+                      (request.brk-rem conn {:bp-id bp-info.bp-id
+                                                 :sign-id sign-id}))
+                    {}))))))))))
+
+(fn setup-breakpoint-autocmds [bufnr]
+  (vim.api.nvim_create_autocmd ["TextChanged" "TextChangedI"]
+    {:group (vim.api.nvim_create_augroup "GrappleBreakpoints" {:clear false})
+     :buffer bufnr
+     :callback clear-breakpoints-in-form}))
 
 (fn on-filetype []
-  ; Initialize breakpoint signs
-  (ui.init-breakpoint-signs)
-  ; Initialize debug position sign
-  (ui.init-debug-sign)
-  (mapping.buf
-    :JanetDisconnect
-    (config.get-in [:client :janet :mrepl :mapping :disconnect])
-    disconnect
-    {:desc "Disconnect from the REPL"})
-  (mapping.buf
-    :JanetConnect
-    (config.get-in [:client :janet :mrepl :mapping :connect])
-    #(connect)
-    {:desc "Connect to a REPL"})
-  (mapping.buf
-    :JanetStart
-    (config.get-in [:client :janet :mrepl :mapping :start-server])
-    #(start-server {})
-    {:desc "Start the Grapple server"})
-  (mapping.buf
-    :JanetStop
-    (config.get-in [:client :janet :mrepl :mapping :stop-server])
-    stop-server
-    {:desc "Stop the Grapple server"})
-  (mapping.buf
-    :JanetAddBreakpoint
-    (config.get-in [:client :janet :mrepl :mapping :add-breakpoint])
-    add-breakpoint
-    {:desc "Add a breakpoint at the cursor"})
-  (mapping.buf
-    :JanetRemoveBreakpoint
-    (config.get-in [:client :janet :mrepl :mapping :remove-breakpoint])
-    remove-breakpoint
-    {:desc "Remove a breakpoint at the cursor"})
-  (mapping.buf
-    :JanetClearBreakpoints
-    (config.get-in [:client :janet :mrepl :mapping :clear-breakpoints])
-    clear-breakpoints
-    {:desc "Clear all breakpoints"})
-  (mapping.buf
-    :JanetContinue
-    (config.get-in [:client :janet :mrepl :mapping :continue])
-    continue-execution
-    {:desc "Continue execution from breakpoint"})
-  (mapping.buf
-    :JanetInspectStack
-    (config.get-in [:client :janet :mrepl :mapping :inspect-stack])
-    inspect-stack
-    {:desc "Inspect the current stack"}))
+  (when (not vim.b.grapple_janet_loaded)
+    (set vim.b.grapple_janet_loaded true)
+    ; Initialize breakpoint signs
+    (ui.init-breakpoint-signs)
+    ; Initialize debug position sign
+    (ui.init-debug-sign)
+    ; Set up autocmds to clear breakpoints on text changes
+    ; Capture the current buffer (the Janet file buffer) when on-filetype is called
+    (setup-breakpoint-autocmds (vim.api.nvim_get_current_buf))
+    (mapping.buf
+      :JanetDisconnect
+      (config.get-in [:client :janet :mrepl :mapping :disconnect])
+      disconnect
+      {:desc "Disconnect from the REPL"})
+    (mapping.buf
+      :JanetConnect
+      (config.get-in [:client :janet :mrepl :mapping :connect])
+      #(connect)
+      {:desc "Connect to a REPL"})
+    (mapping.buf
+      :JanetStart
+      (config.get-in [:client :janet :mrepl :mapping :start-server])
+      #(start-server {})
+      {:desc "Start the Grapple server"})
+    (mapping.buf
+      :JanetStop
+      (config.get-in [:client :janet :mrepl :mapping :stop-server])
+      stop-server
+      {:desc "Stop the Grapple server"})
+    (mapping.buf
+      :JanetAddBreakpoint
+      (config.get-in [:client :janet :mrepl :mapping :add-breakpoint])
+      add-breakpoint
+      {:desc "Add a breakpoint at the cursor"})
+    (mapping.buf
+      :JanetRemoveBreakpoint
+      (config.get-in [:client :janet :mrepl :mapping :remove-breakpoint])
+      remove-breakpoint
+      {:desc "Remove a breakpoint at the cursor"})
+    (mapping.buf
+      :JanetClearBreakpoints
+      (config.get-in [:client :janet :mrepl :mapping :clear-breakpoints])
+      clear-breakpoints
+      {:desc "Clear all breakpoints"})
+    (mapping.buf
+      :JanetDebugContinue
+      (config.get-in [:client :janet :mrepl :mapping :debug-continue])
+      debugger.continue-execution
+      {:desc "Continue execution in debugger"})
+    (mapping.buf
+      :JanetDebugStep
+      (config.get-in [:client :janet :mrepl :mapping :debug-step])
+      debugger.step-execution
+      {:desc "Step to next instruction in debugger"})))
 
 (fn on-load []
   ; Auto-connect disabled - use <localleader>cc to connect manually
@@ -411,6 +446,4 @@
  : on-load
  : add-breakpoint
  : remove-breakpoint
- : continue-execution
- : inspect-stack
  : clear-breakpoints}

@@ -12,13 +12,14 @@ local request = autoload("grapple.client.request")
 local state = autoload("grapple.client.state")
 local ts = autoload("conjure.tree-sitter")
 local ui = autoload("grapple.client.ui")
+local debugger = autoload("grapple.client.debugger")
 local buf_suffix = ".janet"
 local comment_prefix = "# "
 local comment_node_3f = ts["lisp-comment-node?"]
 local form_node_3f = ts["node-surrounded-by-form-pair-chars?"]
 config.merge({client = {janet = {mrepl = {connection = {default_host = "127.0.0.1", default_port = "3737", lang = "net.inqk/janet-1.0", ["auto-repl"] = {enabled = true}}}}}})
 if config["get-in"]({"mapping", "enable_defaults"}) then
-  config.merge({client = {janet = {mrepl = {mapping = {connect = "cc", disconnect = "cd", ["start-server"] = "cs", ["stop-server"] = "cS", ["add-breakpoint"] = "dba", ["remove-breakpoint"] = "dbr", ["clear-breakpoints"] = "dbc", continue = "dsc", ["inspect-stack"] = "dis"}}}}})
+  config.merge({client = {janet = {mrepl = {mapping = {connect = "cc", disconnect = "cd", ["start-server"] = "cs", ["stop-server"] = "cS", ["add-breakpoint"] = "ba", ["remove-breakpoint"] = "br", ["clear-breakpoints"] = "bc", ["debug-continue"] = "dc", ["debug-step"] = "ds"}}}}})
 else
 end
 local function process_alive_3f(job_id)
@@ -224,30 +225,35 @@ local function connect(opts)
 end
 local function eval_str(opts)
   local function _32_(conn)
-    return request["env-eval"](conn, opts)
+    local current_buf = vim.api.nvim_get_current_buf()
+    if debugger["is-input-buffer?"](current_buf) then
+      return request["env-dbg"](conn, {code = opts.code, req = debugger["get-debug-req"]()})
+    else
+      return request["env-eval"](conn, opts)
+    end
   end
   return with_conn_or_warn(_32_, opts)
 end
 local function eval_file(opts)
-  local function _33_(conn)
-    return request["env-load"](conn, opts)
-  end
-  return with_conn_or_warn(_33_, opts)
-end
-local function doc_str(opts)
   local function _34_(conn)
-    return request["env-doc"](conn, opts)
+    return request["env-load"](conn, opts)
   end
   return with_conn_or_warn(_34_, opts)
 end
-local function def_str(opts)
+local function doc_str(opts)
   local function _35_(conn)
     return request["env-doc"](conn, opts)
   end
   return with_conn_or_warn(_35_, opts)
 end
-local function add_breakpoint()
+local function def_str(opts)
   local function _36_(conn)
+    return request["env-doc"](conn, opts)
+  end
+  return with_conn_or_warn(_36_, opts)
+end
+local function add_breakpoint()
+  local function _37_(conn)
     local bufnr = vim.api.nvim_get_current_buf()
     local file_path = vim.api.nvim_buf_get_name(bufnr)
     local cursor = vim.api.nvim_win_get_cursor(0)
@@ -257,36 +263,24 @@ local function add_breakpoint()
     if root_form then
       local form_content = root_form.content
       local form_range = root_form.range
-      local form_start_line = (form_range[1] + 1)
-      local form_start_col = form_range[2]
+      local form_start_line = n["get-in"](form_range, {"start", 1})
+      local form_start_col = n["get-in"](form_range, {"start", 2})
       local rel_line = (cursor_line - form_start_line)
       local rel_col
       if (cursor_line == form_start_line) then
         rel_col = (cursor_col - form_start_col)
       else
-        rel_col = cursor_col
+        rel_col = (cursor_col + 1)
       end
-      return request["dbg-brk-add"](conn, {["file-path"] = file_path, line = rel_line, col = rel_col, bufnr = bufnr, form = form_content})
+      return request["brk-add"](conn, {["file-path"] = file_path, rline = rel_line, rcol = rel_col, line = cursor_line, col = cursor_col, bufnr = bufnr, form = form_content})
     else
       return log.append("error", {"Cursor not in a root form"})
     end
   end
-  return with_conn_or_warn(_36_, {})
-end
-local function continue_execution()
-  local function _39_(conn)
-    return request["dbg-step-cont"](conn, {})
-  end
-  return with_conn_or_warn(_39_, {})
-end
-local function inspect_stack()
-  local function _40_(conn)
-    return request["dbg-insp-stk"](conn, {})
-  end
-  return with_conn_or_warn(_40_, {})
+  return with_conn_or_warn(_37_, {})
 end
 local function remove_breakpoint()
-  local function _41_(conn)
+  local function _40_(conn)
     local bufnr = vim.api.nvim_get_current_buf()
     local cursor = vim.api.nvim_win_get_cursor(0)
     local line = cursor[1]
@@ -297,37 +291,95 @@ local function remove_breakpoint()
       local sign_list = buf_signs.signs
       local sign = sign_list[1]
       local sign_id = sign.id
-      return request["dbg-brk-rem"](conn, {["bp-id"] = bp_data["bp-id"], ["sign-id"] = sign_id})
+      return request["brk-rem"](conn, {["bp-id"] = bp_data["bp-id"], ["sign-id"] = sign_id})
     else
       return log.append("error", {"No breakpoint at current line"})
     end
   end
-  return with_conn_or_warn(_41_, {})
+  return with_conn_or_warn(_40_, {})
 end
 local function clear_breakpoints()
-  local function _43_(conn)
-    return request["dbg-brk-clr"](conn, {})
+  local function _42_(conn)
+    return request["brk-clr"](conn, {})
   end
-  return with_conn_or_warn(_43_, {})
+  return with_conn_or_warn(_42_, {})
+end
+local function clear_breakpoints_in_form()
+  local root_form = extract.form({["root?"] = true})
+  if root_form then
+    local form_range = root_form.range
+    local form_start_line = n["get-in"](form_range, {"start", 1})
+    local form_end_line = n["get-in"](form_range, {"end", 1})
+    local bufnr = vim.api.nvim_get_current_buf()
+    local signs = vim.fn.sign_getplaced(bufnr, {group = "grapple_breakpoints"})
+    local buf_signs
+    if (#signs > 0) then
+      buf_signs = signs[1]
+    else
+      buf_signs = nil
+    end
+    local sign_list
+    if buf_signs then
+      sign_list = buf_signs.signs
+    else
+      sign_list = nil
+    end
+    if sign_list then
+      for _, sign in ipairs(sign_list) do
+        if ((sign.lnum >= form_start_line) and (sign.lnum <= form_end_line)) then
+          local sign_id = sign.id
+          local breakpoints = state.get("breakpoints")
+          local bp_info
+          if breakpoints then
+            bp_info = breakpoints[sign_id]
+          else
+            bp_info = nil
+          end
+          if bp_info then
+            local function _46_(conn)
+              return request["brk-rem"](conn, {["bp-id"] = bp_info["bp-id"], ["sign-id"] = sign_id})
+            end
+            with_conn_or_warn(_46_, {})
+          else
+          end
+        else
+        end
+      end
+      return nil
+    else
+      return nil
+    end
+  else
+    return nil
+  end
+end
+local function setup_breakpoint_autocmds(bufnr)
+  return vim.api.nvim_create_autocmd({"TextChanged", "TextChangedI"}, {group = vim.api.nvim_create_augroup("GrappleBreakpoints", {clear = false}), buffer = bufnr, callback = clear_breakpoints_in_form})
 end
 local function on_filetype()
-  ui["init-breakpoint-signs"]()
-  ui["init-debug-sign"]()
-  mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
-  local function _44_()
-    return connect()
+  if not vim.b.grapple_janet_loaded then
+    vim.b.grapple_janet_loaded = true
+    ui["init-breakpoint-signs"]()
+    ui["init-debug-sign"]()
+    setup_breakpoint_autocmds(vim.api.nvim_get_current_buf())
+    mapping.buf("JanetDisconnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "disconnect"}), disconnect, {desc = "Disconnect from the REPL"})
+    local function _51_()
+      return connect()
+    end
+    mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _51_, {desc = "Connect to a REPL"})
+    local function _52_()
+      return start_server({})
+    end
+    mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _52_, {desc = "Start the Grapple server"})
+    mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
+    mapping.buf("JanetAddBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "add-breakpoint"}), add_breakpoint, {desc = "Add a breakpoint at the cursor"})
+    mapping.buf("JanetRemoveBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "remove-breakpoint"}), remove_breakpoint, {desc = "Remove a breakpoint at the cursor"})
+    mapping.buf("JanetClearBreakpoints", config["get-in"]({"client", "janet", "mrepl", "mapping", "clear-breakpoints"}), clear_breakpoints, {desc = "Clear all breakpoints"})
+    mapping.buf("JanetDebugContinue", config["get-in"]({"client", "janet", "mrepl", "mapping", "debug-continue"}), debugger["continue-execution"], {desc = "Continue execution in debugger"})
+    return mapping.buf("JanetDebugStep", config["get-in"]({"client", "janet", "mrepl", "mapping", "debug-step"}), debugger["step-execution"], {desc = "Step to next instruction in debugger"})
+  else
+    return nil
   end
-  mapping.buf("JanetConnect", config["get-in"]({"client", "janet", "mrepl", "mapping", "connect"}), _44_, {desc = "Connect to a REPL"})
-  local function _45_()
-    return start_server({})
-  end
-  mapping.buf("JanetStart", config["get-in"]({"client", "janet", "mrepl", "mapping", "start-server"}), _45_, {desc = "Start the Grapple server"})
-  mapping.buf("JanetStop", config["get-in"]({"client", "janet", "mrepl", "mapping", "stop-server"}), stop_server, {desc = "Stop the Grapple server"})
-  mapping.buf("JanetAddBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "add-breakpoint"}), add_breakpoint, {desc = "Add a breakpoint at the cursor"})
-  mapping.buf("JanetRemoveBreakpoint", config["get-in"]({"client", "janet", "mrepl", "mapping", "remove-breakpoint"}), remove_breakpoint, {desc = "Remove a breakpoint at the cursor"})
-  mapping.buf("JanetClearBreakpoints", config["get-in"]({"client", "janet", "mrepl", "mapping", "clear-breakpoints"}), clear_breakpoints, {desc = "Clear all breakpoints"})
-  mapping.buf("JanetContinue", config["get-in"]({"client", "janet", "mrepl", "mapping", "continue"}), continue_execution, {desc = "Continue execution from breakpoint"})
-  return mapping.buf("JanetInspectStack", config["get-in"]({"client", "janet", "mrepl", "mapping", "inspect-stack"}), inspect_stack, {desc = "Inspect the current stack"})
 end
 local function on_load()
   return nil
@@ -344,12 +396,12 @@ local function modify_client_exec_fn_opts(action, f_name, opts)
   end
   if (opts["on-result"] and opts["suppress-hud?"]) then
     local on_result = opts["on-result"]
-    local function _47_(result)
+    local function _55_(result)
       return on_result(("=> " .. result))
     end
-    return n.assoc(opts, "on-result", _47_)
+    return n.assoc(opts, "on-result", _55_)
   else
     return opts
   end
 end
-return {["buf-suffix"] = buf_suffix, ["comment-node?"] = comment_node_3f, ["comment-prefix"] = comment_prefix, ["start-server"] = start_server, ["stop-server"] = stop_server, connect = connect, disconnect = disconnect, ["def-str"] = def_str, ["doc-str"] = doc_str, ["eval-file"] = eval_file, ["eval-str"] = eval_str, ["form-node?"] = form_node_3f, ["modify-client-exec-fn-opts"] = modify_client_exec_fn_opts, ["on-exit"] = on_exit, ["on-filetype"] = on_filetype, ["on-load"] = on_load, ["add-breakpoint"] = add_breakpoint, ["remove-breakpoint"] = remove_breakpoint, ["continue-execution"] = continue_execution, ["inspect-stack"] = inspect_stack, ["clear-breakpoints"] = clear_breakpoints}
+return {["buf-suffix"] = buf_suffix, ["comment-node?"] = comment_node_3f, ["comment-prefix"] = comment_prefix, ["start-server"] = start_server, ["stop-server"] = stop_server, connect = connect, disconnect = disconnect, ["def-str"] = def_str, ["doc-str"] = doc_str, ["eval-file"] = eval_file, ["eval-str"] = eval_str, ["form-node?"] = form_node_3f, ["modify-client-exec-fn-opts"] = modify_client_exec_fn_opts, ["on-exit"] = on_exit, ["on-filetype"] = on_filetype, ["on-load"] = on_load, ["add-breakpoint"] = add_breakpoint, ["remove-breakpoint"] = remove_breakpoint, ["clear-breakpoints"] = clear_breakpoints}

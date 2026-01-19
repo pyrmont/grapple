@@ -307,10 +307,10 @@
   # glue back together
   (def result @[])
   (unless (empty? prefix)
-    (array/push result {:type :equal :text prefix}))
+    (array/push result @{:type :equal :text prefix}))
   (array/concat result diff-core)
   (unless (empty? suffix)
-    (array/push result {:type :equal :text suffix}))
+    (array/push result @{:type :equal :text suffix}))
   # merge small, isolated equal segments
   (merge-islands result))
 

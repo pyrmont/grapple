@@ -204,6 +204,4 @@
           (fn []
             (client.add-breakpoint)
             (client.remove-breakpoint)
-            (client.clear-breakpoints)
-            (client.continue-execution)
-            (client.inspect-stack)))))))
+            (client.clear-breakpoints)))))))

@@ -7,6 +7,7 @@ local n = autoload("conjure.nfnl.core")
 local state = autoload("grapple.client.state")
 local str = autoload("conjure.nfnl.string")
 local ui = autoload("grapple.client.ui")
+local debugger = autoload("grapple.client.debugger")
 local function upcase(s, n0)
   local start = string.sub(s, 1, n0)
   local rest = string.sub(s, (n0 + 1))
@@ -51,7 +52,7 @@ local function handle_cmd(resp)
       end
     end
     for _, location in ipairs(removed_locations) do
-      log.append("debug", {("Removed stale breakpoint at " .. location)})
+      log.append("info", {("Removed stale breakpoint at " .. location)})
     end
     return nil
   else
@@ -70,26 +71,7 @@ local function handle_env_eval(resp, opts)
   elseif ("note" == resp.tag) then
     return log.append("note", {resp.val})
   elseif (("sig" == resp.tag) and ("debug" == resp.val)) then
-    local location
-    if (resp["janet/path"] and resp["janet/line"]) then
-      location = (" at " .. resp["janet/path"] .. ":" .. resp["janet/line"])
-    else
-      location = ""
-    end
-    log.append("debug", {("Paused at breakpoint" .. location)})
-    log.append("debug", {"Use <localleader>dis to inspect stack, <localleader>dsc to continue"})
-    if (resp["janet/path"] and resp["janet/line"]) then
-      local file_path = resp["janet/path"]
-      local line = resp["janet/line"]
-      local bufnr = vim.fn.bufnr(file_path)
-      if (bufnr ~= -1) then
-        return ui["show-debug-indicators"](bufnr, file_path, line)
-      else
-        return nil
-      end
-    else
-      return nil
-    end
+    return debugger["handle-signal"](resp)
   elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
     if (opts["on-result"] and not resp["janet/reeval?"]) then
       opts["on-result"](resp.val)
@@ -100,21 +82,28 @@ local function handle_env_eval(resp, opts)
     return nil
   end
 end
+local function handle_env_dbg(resp, opts)
+  if (("ret" == resp.tag) and (nil ~= resp.val)) then
+    return log.append("result", {resp.val})
+  else
+    return handle_env_eval(resp, opts)
+  end
+end
 local function handle_env_doc(resp, action)
   if ("doc" == action) then
     local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _11_
+    local _9_
     if not resp["janet/sm"] then
-      _11_ = "\n"
+      _9_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _11_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _9_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _11_)
+    sm_info = (resp["janet/type"] .. "\n" .. _9_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -133,7 +122,7 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_win_set_option(win, "scrolloff", 0)
     vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
     vim.api.nvim_win_set_option(win, "breakindent", true)
-    local function _14_()
+    local function _12_()
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       else
@@ -141,7 +130,7 @@ local function handle_env_doc(resp, action)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _14_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _12_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -156,10 +145,10 @@ local function handle_env_doc(resp, action)
     return nil
   end
 end
-local function handle_dbg_brk_add(resp, opts)
+local function handle_brk_add(resp, opts)
   if ("ret" == resp.tag) then
     local bp_id = resp["janet/bp-id"]
-    log.append("debug", {("Added breakpoint at " .. opts["file-path"] .. ":" .. opts.line)})
+    log.append("info", {("Added breakpoint at " .. opts["file-path"] .. ":" .. opts.line)})
     return ui["add-breakpoint-sign"](opts.bufnr, opts["file-path"], opts.line, bp_id)
   elseif ("err" == resp.tag) then
     return display_error(("Failed to add breakpoint: " .. resp.val), resp)
@@ -167,13 +156,13 @@ local function handle_dbg_brk_add(resp, opts)
     return nil
   end
 end
-local function handle_dbg_brk_rem(resp, opts)
+local function handle_brk_rem(resp, opts)
   if ("ret" == resp.tag) then
     local breakpoints = state.get("breakpoints")
     local bp_data = breakpoints[opts["sign-id"]]
     local current_line = ui["get-sign-current-line"](opts["sign-id"])
     if (bp_data and current_line) then
-      log.append("debug", {("Removed breakpoint at " .. bp_data["file-path"] .. ":" .. current_line)})
+      log.append("info", {("Removed breakpoint at " .. bp_data["file-path"] .. ":" .. current_line)})
     else
     end
     return ui["remove-breakpoint-sign"](opts["sign-id"])
@@ -183,9 +172,9 @@ local function handle_dbg_brk_rem(resp, opts)
     return nil
   end
 end
-local function handle_dbg_brk_clr(resp)
+local function handle_brk_clr(resp)
   if ("ret" == resp.tag) then
-    log.append("debug", {"Cleared all breakpoints"})
+    log.append("info", {"Cleared all breakpoints"})
     return ui["clear-breakpoint-signs"]()
   elseif ("err" == resp.tag) then
     return display_error(("Failed to clear breakpoints: " .. resp.val), resp)
@@ -193,22 +182,11 @@ local function handle_dbg_brk_clr(resp)
     return nil
   end
 end
-local function handle_dbg_step_cont(resp)
+local function handle_brk_list(resp, opts)
   if ("ret" == resp.tag) then
-    return ui["hide-debug-indicators"]()
-  elseif ("err" == resp.tag) then
-    return display_error(("Failed to continue: " .. resp.val), resp)
-  else
-    return nil
-  end
-end
-local function handle_dbg_insp_stk(resp)
-  if (("ret" == resp.tag) and resp.val) then
     return log.append("result", {resp.val})
-  elseif ("ret" == resp.tag) then
-    return log.append("debug", {"No stack frames available"})
   elseif ("err" == resp.tag) then
-    return display_error(("Failed to inspect stack: " .. resp.val), resp)
+    return display_error(("Failed to list breakpoints: " .. resp.val), resp)
   else
     return nil
   end
@@ -242,16 +220,16 @@ local function handle_message(msg, opts)
       return handle_env_doc(msg, action)
     elseif ("env.cmpl" == msg.op) then
       return __fnl_global__handle_2denv_2dcmpl(msg)
-    elseif ("dbg.brk.add" == msg.op) then
-      return handle_dbg_brk_add(msg, opts)
-    elseif ("dbg.brk.rem" == msg.op) then
-      return handle_dbg_brk_rem(msg, opts)
-    elseif ("dbg.brk.clr" == msg.op) then
-      return handle_dbg_brk_clr(msg)
-    elseif ("dbg.step.cont" == msg.op) then
-      return handle_dbg_step_cont(msg)
-    elseif ("dbg.insp.stk" == msg.op) then
-      return handle_dbg_insp_stk(msg)
+    elseif ("env.dbg" == msg.op) then
+      return handle_env_dbg(msg, opts)
+    elseif ("brk.add" == msg.op) then
+      return handle_brk_add(msg, opts)
+    elseif ("brk.rem" == msg.op) then
+      return handle_brk_rem(msg, opts)
+    elseif ("brk.clr" == msg.op) then
+      return handle_brk_clr(msg)
+    elseif ("brk.list" == msg.op) then
+      return handle_brk_list(msg, opts)
     else
       return log.append("error", {"Unrecognised message"})
     end

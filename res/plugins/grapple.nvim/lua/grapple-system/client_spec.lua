@@ -182,9 +182,7 @@ local function _20_()
     local function _30_()
       client["add-breakpoint"]()
       client["remove-breakpoint"]()
-      client["clear-breakpoints"]()
-      client["continue-execution"]()
-      return client["inspect-stack"]()
+      return client["clear-breakpoints"]()
     end
     return assert.has_no.errors(_30_)
   end

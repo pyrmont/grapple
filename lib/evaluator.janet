@@ -1,6 +1,9 @@
 (import ./utilities :as util)
 (import ./deps :as deps)
 
+(def- debugger-env
+  (require "./debugger"))
+
 (defn- dprint [v]
   (xprintf stdout "%q" v))
 
@@ -145,32 +148,23 @@
       (do
         (def stack (debug/stack f))
         (def frame (first stack))
-        (def send (opts :sig))
-        (send "debug"
-              {"janet/path" (frame :source)
-               "janet/line" (frame :source-line)
-               "janet/col" (frame :source-column)})
-        # Debug loop for debugging commands
-        (var action (debug)) # yields back to parent fiber
+        (def func (frame :function))
+        (def send-sig (opts :sig))
+        (send-sig "debug" (util/debug-payload f :debug))
+        (var action (debug)) # yields to handler
         (forever
-          (case action
-            :continue
-            (break)
-            :stack
-            (do
-              (def frames (debug/stack f))
-              (def frame-data
-                (map (fn [fr]
-                       {:pc (fr :pc)
-                        :name (fr :name)
-                        :path (fr :source)
-                        :line (fr :source-line)
-                        :col (fr :source-column)
-                        :locals (fr :locals)})
-                     frames))
-              (set action (debug frame-data))) # yields back to parent fiber
-            # unrecognised action
-            (error (string "unknown debug action: " action)))))
+          (set action
+            (case action
+              :continue (break)
+              :step (do
+                      (debug/step f)
+                      (if (= :debug (fiber/status f))
+                        (debug)  # yield again, still debugging
+                        (break))) # done stepping, continue execution
+              :fiber (debug f)
+              :stack (debug (debug/stack f))
+              # default - unknown command
+              (debug nil)))))
       # errors
       (do
         (def send (opts :err))
@@ -216,8 +210,8 @@
     (table/setproto new-eval-env new-env))
   (def eval1-env (module-make-env env true))
   (def reevaluating @{})
-  (def opts {:ret ret
-             :err err
+  (def opts {:err err
+             :ret ret
              :sig sig
              :reevaluating reevaluating})
   (def on-status (debugger-on-status env 1 opts))
@@ -421,3 +415,8 @@
       (parse-err p where)))
   # TODO: Should this return env as the alternative?
   (in eval1-env :exit-value))
+
+(defn run-debug [code fiber signal &named req send sess]
+  (put debugger-env :fiber fiber)
+  (put debugger-env :signal signal)
+  (run code :env debugger-env :path "<debug>" :req req :send send :sess sess))

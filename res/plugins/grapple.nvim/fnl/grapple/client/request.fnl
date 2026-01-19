@@ -39,6 +39,7 @@
              opts))
 
 (fn env-load [conn opts]
+  (log.append :info ["Loading file..."])
   (conn.send {:op "env.load"
               :path opts.file-path}
              opts))
@@ -58,34 +59,34 @@
               :sym opts.code}
              opts))
 
-(fn dbg-brk-add [conn opts]
-  ; (log.append :debug [(.. "Setting breakpoint at " opts.file-path ":" opts.line)])
-  (conn.send {:op "dbg.brk.add"
+(fn brk-add [conn opts]
+  (conn.send {:op "brk.add"
               :path opts.file-path
-              :janet/rline opts.line
-              :janet/rcol opts.col
+              :janet/rline opts.rline
+              :janet/rcol opts.rcol
               :janet/form opts.form}
              opts))
 
-(fn dbg-brk-rem [conn opts]
+(fn brk-rem [conn opts]
   ; (log.append :debug [(.. "Removing breakpoint with ID: " opts.bp-id)])
-  (conn.send {:op "dbg.brk.rem"
+  (conn.send {:op "brk.rem"
               :bp-id opts.bp-id}
              opts))
 
-(fn dbg-brk-clr [conn opts]
+(fn brk-clr [conn opts]
   ; (log.append :debug ["Clearing all breakpoints..."])
-  (conn.send {:op "dbg.brk.clr"}
+  (conn.send {:op "brk.clr"}
              opts))
 
-(fn dbg-step-cont [conn opts]
-  (log.append :debug ["Continuing execution..."])
-  (conn.send {:op "dbg.step.cont"}
+(fn brk-list [conn opts]
+  (conn.send {:op "brk.list"}
              opts))
 
-(fn dbg-insp-stk [conn opts]
-  (log.append :debug ["Inspecting stack..."])
-  (conn.send {:op "dbg.insp.stk"}
+(fn env-dbg [conn opts]
+  (log.append :debug [opts.code])
+  (conn.send {:op "env.dbg"
+              :code opts.code
+              :req opts.req}
              opts))
 
 {: sess-new
@@ -99,8 +100,8 @@
  : env-stop
  : env-doc
  : env-cmpl
- : dbg-brk-add
- : dbg-brk-rem
- : dbg-brk-clr
- : dbg-step-cont
- : dbg-insp-stk}
+ : brk-add
+ : brk-rem
+ : brk-clr
+ : brk-list
+ : env-dbg}

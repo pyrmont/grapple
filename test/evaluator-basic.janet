@@ -284,7 +284,11 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 24
-                 "janet/stack" [{:col 19 :line 1 :name "foo" :path u/ns}]})
+                 "janet/stack" @[{:col 19 :line 1 :name "foo" :path u/ns
+                                  :pc 0 :tail nil
+                                  :function "<function foo>"
+                                  :slots "@[1 nil]"
+                                  :locals "@{x 1}"}]})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -310,7 +314,11 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1
-                 "janet/stack" [{:col 1 :line 1 :name "thunk" :path u/ns}]})
+                 "janet/stack" @[{:col 1 :line 1 :name "thunk" :path u/ns
+                                  :pc 2 :tail true
+                                  :function "<function thunk>"
+                                  :slots "@[nil 1 nil]"
+                                  :locals "nil"}]})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   (is (not (parser/has-more p))))
