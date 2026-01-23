@@ -1,2 +1,8 @@
+.beans
+.beans.yml
 .cache/
 .DS_Store
+CLAUDE.md
+examples/
+notes/
+symlinks/
