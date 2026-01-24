@@ -19,6 +19,7 @@ Grapple offers:
 - per-file evaluation environments
 - transitive `import` calls
 - dependent binding tracking
+- integrated debugger with breakpoints, stepping and stack inspection
 
 Grapple implements the mREPL protocol. mREPL is an in-development message-based
 REPL protocol, similar to nREPL but with a simpler design.
@@ -143,6 +144,17 @@ Once configured, Grapple provides the following key bindings when editing Janet 
 - `<localleader>e!`: Evaluates and replaces the form with its result
 - `<localleader>em`: Evaluates the marked form
 - `<localleader>ew`: Evaluates the word under the cursor
+
+**Debugging:**
+- `<localleader>ba`: Adds a breakpoint at the cursor
+- `<localleader>br`: Removes the breakpoint at the cursor
+- `<localleader>bc`: Clears all breakpoints
+- `<localleader>dc`: Continues execution in the debugger
+- `<localleader>ds`: Steps to the next instruction in the debugger
+
+When a breakpoint is hit, Grapple opens a debugger tab with multiple panes showing
+the fiber state (call stack and local bindings), bytecode view, source code, and an
+interactive input buffer for evaluating expressions in the debug context.
 
 By default, `<localleader>` is mapped to `\` in Neovim.
 
