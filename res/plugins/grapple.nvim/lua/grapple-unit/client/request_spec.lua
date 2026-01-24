@@ -166,13 +166,13 @@ local function _23_()
       return "test-action"
     end
     opts = {action = _26_}
-    request["serv-info"](conn, opts)
-    assert.equals("serv.info", sent_msg.op)
+    request["mgmt-info"](conn, opts)
+    assert.equals("mgmt.info", sent_msg.op)
     return assert.equals(opts, sent_opts)
   end
-  return it("sends serv.info message with action", _24_)
+  return it("sends mgmt.info message with action", _24_)
 end
-describe("serv-info", _23_)
+describe("mgmt-info", _23_)
 local function _27_()
   local function _28_()
     local sent_msg = nil
@@ -189,13 +189,13 @@ local function _27_()
       return "test-action"
     end
     opts = {action = _30_}
-    request["serv-stop"](conn, opts)
-    assert.equals("serv.stop", sent_msg.op)
+    request["mgmt-stop"](conn, opts)
+    assert.equals("mgmt.stop", sent_msg.op)
     return assert.equals(opts, sent_opts)
   end
-  return it("sends serv.stop message with action", _28_)
+  return it("sends mgmt.stop message with action", _28_)
 end
-describe("serv-stop", _27_)
+describe("mgmt-stop", _27_)
 local function _31_()
   local function _32_()
     log_calls = {}
@@ -205,16 +205,16 @@ local function _31_()
   local function _33_()
     local conn = {}
     local opts = {}
-    request["serv-rest"](conn, opts)
+    request["mgmt-rest"](conn, opts)
     assert.equals(1, #log_calls)
     assert.equals("error", log_calls[1].sec)
     local lines = log_calls[1].lines
     assert.equals(1, #lines)
-    return assert.equals("serv.rest is not supported", lines[1])
+    return assert.equals("mgmt.rest is not supported", lines[1])
   end
-  return it("logs error that serv.rest is not supported", _33_)
+  return it("logs error that mgmt.rest is not supported", _33_)
 end
-describe("serv-rest", _31_)
+describe("mgmt-rest", _31_)
 local function _34_()
   local function _35_()
     log_calls = {}

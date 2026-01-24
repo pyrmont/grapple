@@ -18,16 +18,16 @@
   (conn.send {:op "sess.list"}
              opts))
 
-(fn serv-info [conn opts]
-  (conn.send {:op "serv.info"}
+(fn mgmt-info [conn opts]
+  (conn.send {:op "mgmt.info"}
              opts))
 
-(fn serv-stop [conn opts]
-  (conn.send {:op "serv.stop"}
+(fn mgmt-stop [conn opts]
+  (conn.send {:op "mgmt.stop"}
              opts))
 
-(fn serv-rest [conn opts]
-  (log.append :error ["serv.rest is not supported"]))
+(fn mgmt-rest [conn opts]
+  (log.append :error ["mgmt.rest is not supported"]))
 
 (fn env-eval [conn opts]
   (log.append :input [opts.code])
@@ -92,9 +92,9 @@
 {: sess-new
  : sess-end
  : sess-list
- : serv-info
- : serv-stop
- : serv-rest
+ : mgmt-info
+ : mgmt-stop
+ : mgmt-rest
  : env-eval
  : env-load
  : env-stop

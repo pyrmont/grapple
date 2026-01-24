@@ -19,14 +19,14 @@ end
 local function sess_list(conn, opts)
   return conn.send({op = "sess.list"}, opts)
 end
-local function serv_info(conn, opts)
-  return conn.send({op = "serv.info"}, opts)
+local function mgmt_info(conn, opts)
+  return conn.send({op = "mgmt.info"}, opts)
 end
-local function serv_stop(conn, opts)
-  return conn.send({op = "serv.stop"}, opts)
+local function mgmt_stop(conn, opts)
+  return conn.send({op = "mgmt.stop"}, opts)
 end
-local function serv_rest(conn, opts)
-  return log.append("error", {"serv.rest is not supported"})
+local function mgmt_rest(conn, opts)
+  return log.append("error", {"mgmt.rest is not supported"})
 end
 local function env_eval(conn, opts)
   log.append("input", {opts.code})
@@ -61,4 +61,4 @@ local function env_dbg(conn, opts)
   log.append("debug", {opts.code})
   return conn.send({op = "env.dbg", code = opts.code, req = opts.req}, opts)
 end
-return {["sess-new"] = sess_new, ["sess-end"] = sess_end, ["sess-list"] = sess_list, ["serv-info"] = serv_info, ["serv-stop"] = serv_stop, ["serv-rest"] = serv_rest, ["env-eval"] = env_eval, ["env-load"] = env_load, ["env-stop"] = env_stop, ["env-doc"] = env_doc, ["env-cmpl"] = env_cmpl, ["brk-add"] = brk_add, ["brk-rem"] = brk_rem, ["brk-clr"] = brk_clr, ["brk-list"] = brk_list, ["env-dbg"] = env_dbg}
+return {["sess-new"] = sess_new, ["sess-end"] = sess_end, ["sess-list"] = sess_list, ["mgmt-info"] = mgmt_info, ["mgmt-stop"] = mgmt_stop, ["mgmt-rest"] = mgmt_rest, ["env-eval"] = env_eval, ["env-load"] = env_load, ["env-stop"] = env_stop, ["env-doc"] = env_doc, ["env-cmpl"] = env_cmpl, ["brk-add"] = brk_add, ["brk-rem"] = brk_rem, ["brk-clr"] = brk_clr, ["brk-list"] = brk_list, ["env-dbg"] = env_dbg}

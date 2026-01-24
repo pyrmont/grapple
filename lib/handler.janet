@@ -15,9 +15,9 @@
    "env.eval" {:req ["lang" "id" "sess" "code" "ns"]}
    "env.load" {:req ["lang" "id" "sess" "path"]}
    "env.stop" {:req ["lang" "id" "sess" "req"]}
-   "serv.info" {:req ["lang" "id" "sess"]}
-   "serv.relo" {:req ["lang" "id" "sess"]}
-   "serv.stop" {:req ["lang" "id" "sess"]}
+   "mgmt.info" {:req ["lang" "id" "sess"]}
+   "mgmt.relo" {:req ["lang" "id" "sess"]}
+   "mgmt.stop" {:req ["lang" "id" "sess"]}
    "sess.end" {:req ["lang" "id" "sess"]}
    "sess.list" {:req ["lang" "id" "sess"]}
    "sess.new" {:req ["lang" "id"]}})
@@ -348,15 +348,15 @@
 
 ## Management operations
 
-(defn serv-info [req sns send-ret send-err]
+(defn mgmt-info [req sns send-ret send-err]
   (send-ret nil info-kvs))
 
 # TODO: implement
-(defn serv-relo [req sns send-ret send-err]
+(defn mgmt-relo [req sns send-ret send-err]
   (send-ret "Server reloading..."))
 
 # TODO: implement
-(defn serv-stop [req sns send-ret send-err]
+(defn mgmt-stop [req sns send-ret send-err]
   (send-ret "Server shutting down..."))
 
 (defn handle [req sns send]
@@ -385,9 +385,9 @@
         "env.eval" (env-eval req sns send-ret send-err send)
         "env.load" (env-load req sns send-ret send-err send)
         "env.stop" (send-err "operation not implemented")
-        "serv.info" (serv-info req sns send-ret send-err)
-        "serv.relo" (serv-relo req sns send-ret send-err)
-        "serv.stop" (serv-stop req sns send-ret send-err)
+        "mgmt.info" (mgmt-info req sns send-ret send-err)
+        "mgmt.relo" (mgmt-relo req sns send-ret send-err)
+        "mgmt.stop" (mgmt-stop req sns send-ret send-err)
         "sess.end" (sess-end req sns send-ret send-err)
         "sess.new" (sess-new req sns send-ret send-err)
         "sess.list" (sess-list req sns send-ret send-err))

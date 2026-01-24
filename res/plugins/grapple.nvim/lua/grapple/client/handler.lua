@@ -204,12 +204,12 @@ local function handle_message(msg, opts)
       return __fnl_global__handle_2dsess_2dend(msg)
     elseif ("sess.list" == msg.op) then
       return __fnl_global__handle_2dsess_2dlist(msg)
-    elseif ("serv.info" == msg.op) then
-      return __fnl_global__handle_2dsess_2dinfo(msg)
-    elseif ("serv.stop" == msg.op) then
-      return __fnl_global__handle_2dserv_2dstop(msg)
-    elseif ("serv.rest" == msg.op) then
-      return __fnl_global__handle_2dserv_2drest(msg)
+    elseif ("mgmt.info" == msg.op) then
+      return __fnl_global__handle_2dmgmt_2dinfo(msg)
+    elseif ("mgmt.stop" == msg.op) then
+      return __fnl_global__handle_2dmgmt_2dstop(msg)
+    elseif ("mgmt.rest" == msg.op) then
+      return __fnl_global__handle_2dmgmt_2drest(msg)
     elseif ("env.eval" == msg.op) then
       return handle_env_eval(msg, opts)
     elseif ("env.load" == msg.op) then

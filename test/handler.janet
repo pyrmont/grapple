@@ -187,10 +187,10 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest serv-info
+(deftest mgmt-info
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv.info"
+  (h/handle {"op" "mgmt.info"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -198,7 +198,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv.info"
+               "op" "mgmt.info"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -211,10 +211,10 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest serv-stop
+(deftest mgmt-stop
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv.stop"
+  (h/handle {"op" "mgmt.stop"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -222,7 +222,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv.stop"
+               "op" "mgmt.stop"
                "lang" u/lang
                "req" "1"
                "sess" "1"
@@ -231,10 +231,10 @@
   (is (== expect actual))
   (is (zero? (ev/count chan))))
 
-(deftest serv-relo
+(deftest mgmt-relo
   (def sessions (make-sessions))
   (def [recv send chan] (make-stream))
-  (h/handle {"op" "serv.relo"
+  (h/handle {"op" "mgmt.relo"
              "lang" u/lang
              "id" "1"
              "sess" "1"}
@@ -242,7 +242,7 @@
             send)
   (def actual (recv))
   (def expect {"tag" "ret"
-               "op" "serv.relo"
+               "op" "mgmt.relo"
                "lang" u/lang
                "req" "1"
                "sess" "1"

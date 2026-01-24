@@ -113,9 +113,9 @@
           (assert.equals "sess.list" sent-msg.op)
           (assert.equals opts sent-opts))))))
 
-(describe "serv-info"
+(describe "mgmt-info"
   (fn []
-    (it "sends serv.info message with action"
+    (it "sends mgmt.info message with action"
       (fn []
         (var sent-msg nil)
         (var sent-opts nil)
@@ -123,13 +123,13 @@
                             (set sent-msg msg)
                             (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
-          (request.serv-info conn opts)
-          (assert.equals "serv.info" sent-msg.op)
+          (request.mgmt-info conn opts)
+          (assert.equals "mgmt.info" sent-msg.op)
           (assert.equals opts sent-opts))))))
 
-(describe "serv-stop"
+(describe "mgmt-stop"
   (fn []
-    (it "sends serv.stop message with action"
+    (it "sends mgmt.stop message with action"
       (fn []
         (var sent-msg nil)
         (var sent-opts nil)
@@ -137,27 +137,27 @@
                             (set sent-msg msg)
                             (set sent-opts opts))}
               opts {:action (fn [] "test-action")}]
-          (request.serv-stop conn opts)
-          (assert.equals "serv.stop" sent-msg.op)
+          (request.mgmt-stop conn opts)
+          (assert.equals "mgmt.stop" sent-msg.op)
           (assert.equals opts sent-opts))))))
 
-(describe "serv-rest"
+(describe "mgmt-rest"
   (fn []
     (before_each
       (fn []
         (set log-calls [])))
 
-    (it "logs error that serv.rest is not supported"
+    (it "logs error that mgmt.rest is not supported"
       (fn []
         (let [conn {}
               opts {}]
-          (request.serv-rest conn opts)
+          (request.mgmt-rest conn opts)
           ;; Should have logged an error
           (assert.equals 1 (length log-calls))
           (assert.equals :error (. (. log-calls 1) :sec))
           (let [lines (. (. log-calls 1) :lines)]
             (assert.equals 1 (length lines))
-            (assert.equals "serv.rest is not supported" (. lines 1))))))))
+            (assert.equals "mgmt.rest is not supported" (. lines 1))))))))
 
 (describe "env-eval"
   (fn []

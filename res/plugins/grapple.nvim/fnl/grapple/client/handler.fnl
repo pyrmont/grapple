@@ -203,14 +203,14 @@
       (= "sess.list" msg.op)
       (handle-sess-list msg)
 
-      (= "serv.info" msg.op)
-      (handle-sess-info msg)
+      (= "mgmt.info" msg.op)
+      (handle-mgmt-info msg)
 
-      (= "serv.stop" msg.op)
-      (handle-serv-stop msg)
+      (= "mgmt.stop" msg.op)
+      (handle-mgmt-stop msg)
 
-      (= "serv.rest" msg.op)
-      (handle-serv-rest msg)
+      (= "mgmt.rest" msg.op)
+      (handle-mgmt-rest msg)
 
       (= "env.eval" msg.op)
       (handle-env-eval msg opts)
