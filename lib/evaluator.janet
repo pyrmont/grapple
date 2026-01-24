@@ -7,39 +7,6 @@
 (defn- dprint [v]
   (xprintf stdout "%q" v))
 
-(defn- collect-affected-nodes [initial-path initial-sym sess]
-  (def affected @[])
-  (def visited @{})
-  (def queue @[[initial-path initial-sym]])
-  (while (not (empty? queue))
-    (def [path sym] (array/pop queue))
-    (def key (string path ":" sym))
-    # Skip if already visited
-    (unless (in visited key)
-      (put visited key true)
-      (def graph (get-in sess [:dep-graph path]))
-      (when graph
-        # Add all local dependents to the affected set
-        (def local-deps (deps/get-reeval-order path sym sess))
-        (each dep local-deps
-          (def dep-key (string path ":" dep))
-          (unless (in visited dep-key)
-            (array/push affected [path dep])
-            (array/push queue [path dep])))
-        # Add cross-file dependents
-        (def importers (get-in graph [:importers sym] @[]))
-        (each {:file other-path :as imported-sym} importers
-          (def other-graph (get-in sess [:dep-graph other-path]))
-          (when other-graph
-            # Find what depends on the imported symbol in the other file
-            (def other-deps (deps/get-reeval-order other-path imported-sym sess))
-            (each other-dep other-deps
-              (def other-key (string other-path ":" other-dep))
-              (unless (in visited other-key)
-                (array/push affected [other-path other-dep])
-                (array/push queue [other-path other-dep]))))))))
-  affected)
-
 (def- eval-root-env
   (do
     (defn rebind [env sym new-val]
@@ -291,63 +258,67 @@
       (f)
       (put reevaluating sym nil)))
   (defn reeval-depents [sym]
-    (def graph (get-dep-graph path))
-    (def to-reeval (deps/get-reeval-order path sym sess))
-    # send informational message only at the top level (when not already reevaluating)
-    (unless (or (empty? to-reeval) (not (empty? reevaluating)))
-      (def dep-names (string/join (map string to-reeval) ", "))
-      (note (string "Re-evaluating dependents of " sym ": " dep-names)))
-    # re-evaluate each dependent using stored source
-    (each dep to-reeval
-      (when (def source (get-in graph [:sources dep :form]))
-        (reeval-with-tracking dep (fn [] (eval1 source)))))
-    # return early if already reevaluating
+    # return early if already reevaluating (nested cascade)
     (unless (empty? reevaluating)
       (break))
-    # Collect all affected nodes (including circular deps back to same file)
-    (def all-affected (collect-affected-nodes path sym sess))
-    # Filter out only the local deps we already handled above.
-    # Don't filter all same-file symbols - circular deps can return to same file!
-    (def cross-reeval (filter (fn [[p s]]
-                                (not (and (= p path) (has-value? to-reeval s))))
-                              all-affected))
+    # Get direct local dependents (file-local only, no cross-file)
+    (def local-deps (deps/get-reeval-order path sym sess))
+    (def local-deps-set @{})
+    (each dep local-deps
+      (put local-deps-set dep true))
+    # Collect all affected nodes (both local and cross-file)
+    (def all-affected (deps/collect-affected-nodes path sym sess))
     # If nothing to re-evaluate, return early
-    (when (empty? cross-reeval)
+    (when (empty? all-affected)
       (break))
-    # Topologically sort all affected nodes
-    (def ordered (deps/topological-sort cross-reeval sess))
+    # Topologically sort all affected nodes (unified pass)
+    (def ordered (deps/topological-sort all-affected sess))
     # Track which files we've sent notifications for
     (def notified-files @{})
-    # Re-evaluate in topological order, sending note before first symbol in each file
-    (each [other-path other-sym] ordered
+    # Re-evaluate in topological order
+    (each [node-path node-sym] ordered
+      # Check if this is a direct local dependent (vs circular/cross-file)
+      (def is-local? (and (= node-path path) (in local-deps-set node-sym)))
       # Send notification for this file if we haven't yet
-      (unless (in notified-files other-path)
-        (put notified-files other-path true)
+      (unless (in notified-files node-path)
+        (put notified-files node-path true)
         # Collect all symbols from this file that will be re-evaluated
-        (def file-syms (filter (fn [[p s]] (= p other-path)) ordered))
+        (def file-syms (filter (fn [[p s]] (= p node-path)) ordered))
         (def sym-names (map (fn [[p s]] s) file-syms))
         (def dep-names (string/join (map string sym-names) ", "))
-        (note (string "Re-evaluating in " other-path ": " dep-names)))
-      # Re-evaluate this symbol
-      (def other-graph (get-in sess [:dep-graph other-path]))
-      (def other-env (module/cache other-path))
-      (when (and other-graph other-env)
-        # Update imported bindings before re-evaluating
-        (each dep (get-in other-graph [:deps other-sym] @[])
-          # Check if this dependency is imported from another file
-          (when (def binding (get other-env dep))
-            (def source-map (get binding :source-map))
-            (when (and (tuple? source-map) (not= (get source-map 0) other-path))
-              (def dep-path (get source-map 0))
-              (when (def dep-env (module/cache dep-path))
-                # Find and update the binding
-                (each source-binding dep-env
-                  (when (= (get source-binding :source-map) source-map)
-                    (put other-env dep source-binding)
-                    (break)))))))
-        # Re-evaluate the symbol using the fiber-based evaluator
-        (when (def source (get-in other-graph [:sources other-sym :form]))
-          (reeval-with-tracking other-sym (fn [] (eval-in-file source other-env other-path)))))))
+        # Check if ALL symbols in this file are local deps
+        (def all-local? (and (= node-path path)
+                             (all (fn [[p s]] (in local-deps-set s)) file-syms)))
+        (if all-local?
+          # Local file notification (only if all symbols are direct local deps)
+          (note (string "Re-evaluating dependents of " sym ": " dep-names))
+          # Cross-file notification (or circular deps)
+          (note (string "Re-evaluating in " node-path ": " dep-names))))
+      # Get graph and environment for this node
+      (def node-graph (get-in sess [:dep-graph node-path]))
+      (def node-env (if is-local? env (module/cache node-path)))
+      (when (and node-graph node-env)
+        # For non-local re-evaluation, update imported bindings
+        (unless is-local?
+          (each dep (get-in node-graph [:deps node-sym] @[])
+            # Check if this dependency is imported from another file
+            (when (def binding (get node-env dep))
+              (def source-map (get binding :source-map))
+              (when (and (tuple? source-map) (not= (get source-map 0) node-path))
+                (def dep-path (get source-map 0))
+                (when (def dep-env (module/cache dep-path))
+                  # Find and update the binding
+                  (each source-binding dep-env
+                    (when (= (get source-binding :source-map) source-map)
+                      (put node-env dep source-binding)
+                      (break))))))))
+        # Re-evaluate the symbol
+        (when (def source (get-in node-graph [:sources node-sym :form]))
+          (if is-local?
+            # Direct local dep: use eval1 (no need for binding updates or different env)
+            (reeval-with-tracking node-sym (fn [] (eval1 source)))
+            # Cross-file or circular: use eval-in-file (with binding updates above)
+            (reeval-with-tracking node-sym (fn [] (eval-in-file source node-env node-path))))))))
   # evaluate 1 source form in a protected manner
   (set eval1 (fn eval1-impl [source &opt l c]
     # check if this is a redefinition (before tracking the new def)

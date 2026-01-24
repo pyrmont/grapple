@@ -390,6 +390,46 @@
     all-deps)
   (kahn-sort affected get-deps get-depnts sess))
 
+(defn collect-affected-nodes
+  ```
+  Collects all nodes (local and cross-file) that need re-evaluation when a symbol changes.
+
+  Uses BFS to traverse both local dependents and cross-file dependents (via importers).
+  Returns an array of [path sym] pairs representing all affected nodes.
+  ```
+  [initial-path initial-sym sess]
+  (def affected @[])
+  (def visited @{})
+  (def queue @[[initial-path initial-sym]])
+  (defn key-fn [[p s]] (string p ":" s))
+  (while (not (empty? queue))
+    (def [path sym] (array/pop queue))
+    (def key (key-fn [path sym]))
+    # Skip if already visited
+    (unless (in visited key)
+      (put visited key true)
+      (def graph (get-in sess [:dep-graph path]))
+      (when graph
+        # Add local dependents
+        (def local-depnts (get-in graph [:dependents sym] @[]))
+        (each dep local-depnts
+          (def dep-key (key-fn [path dep]))
+          (unless (in visited dep-key)
+            (array/push affected [path dep])
+            (array/push queue [path dep])))
+        # Add cross-file dependents via importers
+        (def importers (get-in graph [:importers sym] @[]))
+        (each {:file other-path :as imported-sym} importers
+          (def other-graph (get-in sess [:dep-graph other-path]))
+          (when other-graph
+            (def other-depnts (get-in other-graph [:dependents imported-sym] @[]))
+            (each other-dep other-depnts
+              (def other-key (key-fn [other-path other-dep]))
+              (unless (in visited other-key)
+                (array/push affected [other-path other-dep])
+                (array/push queue [other-path other-dep]))))))))
+  affected)
+
 (defn get-reeval-order
   ```
   Gets the list of symbols to re-evaluate when sym is redefined, in order.
