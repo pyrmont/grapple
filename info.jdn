@@ -28,6 +28,6 @@
  :artifacts {:libraries [{:prefix "grapple"
                           :paths ["deps"
                                   "lib"
-                                  "res"
+                                  "res/plugins/grapple.nvim/lua/grapple"
                                   "init.janet"]}]
              :scripts [{:path "bin/grapple"}]}}
