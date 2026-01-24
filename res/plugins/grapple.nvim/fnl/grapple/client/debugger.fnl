@@ -9,35 +9,52 @@
 ;; Tab-based debugger state
 (var debugger-state nil)
 
+(fn using-splits [f]
+  "Executes function f with deterministic split settings, restoring afterwards"
+  (let [saved-splitright vim.o.splitright
+        saved-splitbelow vim.o.splitbelow
+        saved-equalalways vim.o.equalalways]
+    (set vim.o.splitright true)
+    (set vim.o.splitbelow true)
+    (set vim.o.equalalways false)
+    (let [(ok? result) (pcall f)]
+      ; Always restore settings, whether success or failure
+      (set vim.o.splitright saved-splitright)
+      (set vim.o.splitbelow saved-splitbelow)
+      (set vim.o.equalalways saved-equalalways)
+      ; Re-throw error if function failed
+      (if ok?
+        result
+        (error result)))))
+
 (fn create-debugger-buffers []
   "Creates fiber state, bytecode, source, and input buffers"
   (let [fiber-state-buf (vim.api.nvim_create_buf false true)
         bytecode-buf (vim.api.nvim_create_buf false true)
         source-buf (vim.api.nvim_create_buf false true)
         input-buf (vim.api.nvim_create_buf false true)]
-    ; Set buffer options
+    ; Fiber state buffer
     (vim.api.nvim_buf_set_option fiber-state-buf :buftype "nofile")
     (vim.api.nvim_buf_set_option fiber-state-buf :bufhidden "hide")
     (vim.api.nvim_buf_set_option fiber-state-buf :modifiable false)
     (vim.api.nvim_buf_set_option fiber-state-buf :filetype "grapple-fiber-state")
-
+    ; Bytecode buffer
     (vim.api.nvim_buf_set_option bytecode-buf :buftype "nofile")
     (vim.api.nvim_buf_set_option bytecode-buf :bufhidden "hide")
     (vim.api.nvim_buf_set_option bytecode-buf :modifiable false)
     (vim.api.nvim_buf_set_option bytecode-buf :filetype "grapple-bytecode")
-
+    ; Source buffer
     (vim.api.nvim_buf_set_option source-buf :buftype "nofile")
     (vim.api.nvim_buf_set_option source-buf :bufhidden "hide")
     (vim.api.nvim_buf_set_option source-buf :modifiable false)
     (vim.api.nvim_buf_set_option source-buf :filetype "janet")
-
+    ; Input buffer
     (vim.api.nvim_buf_set_option input-buf :buftype "nofile")
     (vim.api.nvim_buf_set_option input-buf :bufhidden "hide")
     (vim.api.nvim_buf_set_option input-buf :modifiable true)
     (vim.api.nvim_buf_set_option input-buf :filetype "janet")
     ; Disable linting for this buffer (it's a REPL-like context with debug functions)
     (vim.api.nvim_buf_set_var input-buf :grapple_debug_input true)
-
     {:fiber-state-buf fiber-state-buf
      :bytecode-buf bytecode-buf
      :source-buf source-buf
@@ -45,60 +62,54 @@
 
 (fn create-tab-layout [bufs]
   "Creates a new tab with the debugger layout"
-  ; Create new tab
-  (vim.cmd "tabnew")
-  (let [tab (vim.api.nvim_get_current_tabpage)
-        ; Get the Conjure log buffer
-        log-buf (log.buf)
-        ; Start with the initial window from tabnew
-        initial-win (vim.api.nvim_get_current_win)]
-
-    ; Set up the grid layout:
-    ; ┌────────────┬────────────┬────────┐
-    ; │ Fiber      │ Source     │ Conjure│
-    ; │ State      │ Code       │ Log    │
-    ; ├────────────┼────────────┤        │
-    ; │ Bytecode   │ Input      │        │
-    ; │            │            │        │
-    ; └────────────┴────────────┴────────┘
-
-    ; Build layout left to right, top to bottom
-    ; Start: fiber-state in initial window
-    (let [fiber-state-win initial-win]
-      (vim.api.nvim_win_set_buf fiber-state-win bufs.fiber-state-buf)
-
-      ; Split vertically right → this becomes source
-      (vim.cmd "vsplit")
-      (vim.cmd "wincmd l")
-      (let [source-win (vim.api.nvim_get_current_win)]
-        (vim.api.nvim_win_set_buf source-win bufs.source-buf)
-
-        ; Split vertically right → this becomes log
+  (using-splits (fn []
+    ; Create new tab
+    (vim.cmd "tabnew")
+    (let [tab (vim.api.nvim_get_current_tabpage)
+          ; Get the Conjure log buffer
+          log-buf (log.buf)
+          ; Start with the initial window from tabnew
+          initial-win (vim.api.nvim_get_current_win)]
+      ; Set up the grid layout:
+      ; ┌────────────┬────────────┬────────┐
+      ; │ Fiber      │ Source     │ Conjure│
+      ; │ State      │ Code       │ Log    │
+      ; ├────────────┼────────────┤        │
+      ; │ Bytecode   │ Input      │        │
+      ; │            │            │        │
+      ; └────────────┴────────────┴────────┘
+      ; Build layout left to right, top to bottom
+      ; Start: fiber-state in initial window
+      (let [fiber-state-win initial-win]
+        (vim.api.nvim_win_set_buf fiber-state-win bufs.fiber-state-buf)
+        ; Split vertically right → this becomes source
         (vim.cmd "vsplit")
         (vim.cmd "wincmd l")
-        (let [log-win (vim.api.nvim_get_current_win)]
-          (vim.api.nvim_win_set_buf log-win log-buf)
-
-          ; Go back to fiber-state, split horizontally below to create bytecode
-          (vim.api.nvim_set_current_win fiber-state-win)
-          (vim.cmd "split")
-          (vim.cmd "wincmd j")
-          (let [bytecode-win (vim.api.nvim_get_current_win)]
-            (vim.api.nvim_win_set_buf bytecode-win bufs.bytecode-buf)
-
-            ; Go to source, split horizontally below to create input
-            (vim.api.nvim_set_current_win source-win)
+        (let [source-win (vim.api.nvim_get_current_win)]
+          (vim.api.nvim_win_set_buf source-win bufs.source-buf)
+          ; Split vertically right → this becomes log
+          (vim.cmd "vsplit")
+          (vim.cmd "wincmd l")
+          (let [log-win (vim.api.nvim_get_current_win)]
+            (vim.api.nvim_win_set_buf log-win log-buf)
+            ; Go back to fiber-state, split horizontally below to create bytecode
+            (vim.api.nvim_set_current_win fiber-state-win)
             (vim.cmd "split")
             (vim.cmd "wincmd j")
-            (let [input-win (vim.api.nvim_get_current_win)]
-              (vim.api.nvim_win_set_buf input-win bufs.input-buf)
-
-              {:tab tab
-               :fiber-state-win fiber-state-win
-               :bytecode-win bytecode-win
-               :source-win source-win
-               :input-win input-win
-               :log-win log-win})))))))
+            (let [bytecode-win (vim.api.nvim_get_current_win)]
+              (vim.api.nvim_win_set_buf bytecode-win bufs.bytecode-buf)
+              ; Go to source, split horizontally below to create input
+              (vim.api.nvim_set_current_win source-win)
+              (vim.cmd "split")
+              (vim.cmd "wincmd j")
+              (let [input-win (vim.api.nvim_get_current_win)]
+                (vim.api.nvim_win_set_buf input-win bufs.input-buf)
+                {:tab tab
+                 :fiber-state-win fiber-state-win
+                 :bytecode-win bytecode-win
+                 :source-win source-win
+                 :input-win input-win
+                 :log-win log-win})))))))))
 
 (fn close-debugger-ui []
   "Closes the debugger tab and cleans up"

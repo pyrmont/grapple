@@ -8,6 +8,23 @@ local str = autoload("conjure.nfnl.string")
 local log = autoload("grapple.client.log")
 local ui = autoload("grapple.client.ui")
 local debugger_state = nil
+local function using_splits(f)
+  local saved_splitright = vim.o.splitright
+  local saved_splitbelow = vim.o.splitbelow
+  local saved_equalalways = vim.o.equalalways
+  vim.o.splitright = true
+  vim.o.splitbelow = true
+  vim.o.equalalways = false
+  local ok_3f, result = pcall(f)
+  vim.o.splitright = saved_splitright
+  vim.o.splitbelow = saved_splitbelow
+  vim.o.equalalways = saved_equalalways
+  if ok_3f then
+    return result
+  else
+    return error(result)
+  end
+end
 local function create_debugger_buffers()
   local fiber_state_buf = vim.api.nvim_create_buf(false, true)
   local bytecode_buf = vim.api.nvim_create_buf(false, true)
@@ -33,31 +50,34 @@ local function create_debugger_buffers()
   return {["fiber-state-buf"] = fiber_state_buf, ["bytecode-buf"] = bytecode_buf, ["source-buf"] = source_buf, ["input-buf"] = input_buf}
 end
 local function create_tab_layout(bufs)
-  vim.cmd("tabnew")
-  local tab = vim.api.nvim_get_current_tabpage()
-  local log_buf = log.buf()
-  local initial_win = vim.api.nvim_get_current_win()
-  local fiber_state_win = initial_win
-  vim.api.nvim_win_set_buf(fiber_state_win, bufs["fiber-state-buf"])
-  vim.cmd("vsplit")
-  vim.cmd("wincmd l")
-  local source_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(source_win, bufs["source-buf"])
-  vim.cmd("vsplit")
-  vim.cmd("wincmd l")
-  local log_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(log_win, log_buf)
-  vim.api.nvim_set_current_win(fiber_state_win)
-  vim.cmd("split")
-  vim.cmd("wincmd j")
-  local bytecode_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(bytecode_win, bufs["bytecode-buf"])
-  vim.api.nvim_set_current_win(source_win)
-  vim.cmd("split")
-  vim.cmd("wincmd j")
-  local input_win = vim.api.nvim_get_current_win()
-  vim.api.nvim_win_set_buf(input_win, bufs["input-buf"])
-  return {tab = tab, ["fiber-state-win"] = fiber_state_win, ["bytecode-win"] = bytecode_win, ["source-win"] = source_win, ["input-win"] = input_win, ["log-win"] = log_win}
+  local function _3_()
+    vim.cmd("tabnew")
+    local tab = vim.api.nvim_get_current_tabpage()
+    local log_buf = log.buf()
+    local initial_win = vim.api.nvim_get_current_win()
+    local fiber_state_win = initial_win
+    vim.api.nvim_win_set_buf(fiber_state_win, bufs["fiber-state-buf"])
+    vim.cmd("vsplit")
+    vim.cmd("wincmd l")
+    local source_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(source_win, bufs["source-buf"])
+    vim.cmd("vsplit")
+    vim.cmd("wincmd l")
+    local log_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(log_win, log_buf)
+    vim.api.nvim_set_current_win(fiber_state_win)
+    vim.cmd("split")
+    vim.cmd("wincmd j")
+    local bytecode_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(bytecode_win, bufs["bytecode-buf"])
+    vim.api.nvim_set_current_win(source_win)
+    vim.cmd("split")
+    vim.cmd("wincmd j")
+    local input_win = vim.api.nvim_get_current_win()
+    vim.api.nvim_win_set_buf(input_win, bufs["input-buf"])
+    return {tab = tab, ["fiber-state-win"] = fiber_state_win, ["bytecode-win"] = bytecode_win, ["source-win"] = source_win, ["input-win"] = input_win, ["log-win"] = log_win}
+  end
+  return using_splits(_3_)
 end
 local function close_debugger_ui()
   if debugger_state then
