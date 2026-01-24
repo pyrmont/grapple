@@ -51,8 +51,8 @@
         ;; Start a real Janet server on a test port
         (client.start-server {:host "127.0.0.1" :port test-port})
 
-        ;; Give server time to start
-        (vim.wait 1000 (fn [] false))
+        ;; Wait for server to be ready (condition-based, up to 2 seconds)
+        (vim.wait 2000 (fn [] (state.get :server-ready)))
 
         (let [pid (state.get :server-pid)]
           ;; Should have a PID
@@ -64,7 +64,8 @@
       (fn []
         ;; Start server
         (client.start-server {:host "127.0.0.1" :port test-port})
-        (vim.wait 1000 (fn [] false))
+        ;; Wait for server to be ready
+        (vim.wait 2000 (fn [] (state.get :server-ready)))
 
         ;; Verify it started
         (let [pid (state.get :server-pid)]
@@ -73,8 +74,8 @@
           ;; Stop server
           (client.stop-server)
 
-          ;; Wait for stop
-          (vim.wait 500 (fn [] false))
+          ;; Wait for PID to be cleared (condition-based, up to 1 second)
+          (vim.wait 1000 (fn [] (= nil (state.get :server-pid))))
 
           ;; PID should be cleared
           (assert.is_nil (state.get :server-pid)))))
@@ -83,8 +84,8 @@
       (fn []
         ;; Start with custom port
         (client.start-server {:host "127.0.0.1" :port "9999"})
-        ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
-        (vim.wait 1200 (fn [] false))
+        ;; Wait for server to be ready
+        (vim.wait 2000 (fn [] (state.get :server-ready)))
 
         ;; Should have started
         (assert.is_not_nil (state.get :server-pid))))
@@ -93,19 +94,20 @@
       (fn []
         ;; First cycle
         (client.start-server {:host "127.0.0.1" :port test-port})
-        ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
-        (vim.wait 1200 (fn [] false))
+        ;; Wait for server to be ready
+        (vim.wait 2000 (fn [] (state.get :server-ready)))
         (let [pid1 (state.get :server-pid)]
           (assert.is_not_nil pid1)
 
           (client.stop-server)
-          (vim.wait 500 (fn [] false))
+          ;; Wait for PID to be cleared
+          (vim.wait 1000 (fn [] (= nil (state.get :server-pid))))
           (assert.is_nil (state.get :server-pid))
 
           ;; Second cycle
           (client.start-server {:host "127.0.0.1" :port test-port})
-          ;; Wait for deferred function to set server-pid (1000ms delay + buffer)
-          (vim.wait 1200 (fn [] false))
+          ;; Wait for server to be ready
+          (vim.wait 2000 (fn [] (state.get :server-ready)))
           (let [pid2 (state.get :server-pid)]
             (assert.is_not_nil pid2)))))))
 

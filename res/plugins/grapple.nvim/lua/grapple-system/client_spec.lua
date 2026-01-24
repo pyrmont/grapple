@@ -53,9 +53,9 @@ local function _3_()
   local function _9_()
     client["start-server"]({host = "127.0.0.1", port = test_port})
     local function _10_()
-      return false
+      return state.get("server-ready")
     end
-    vim.wait(1000, _10_)
+    vim.wait(2000, _10_)
     local pid = state.get("server-pid")
     assert.is_not_nil(pid)
     return assert.is_number(pid)
@@ -64,47 +64,47 @@ local function _3_()
   local function _11_()
     client["start-server"]({host = "127.0.0.1", port = test_port})
     local function _12_()
-      return false
+      return state.get("server-ready")
     end
-    vim.wait(1000, _12_)
+    vim.wait(2000, _12_)
     local pid = state.get("server-pid")
     assert.is_not_nil(pid)
     client["stop-server"]()
     local function _13_()
-      return false
+      return (nil == state.get("server-pid"))
     end
-    vim.wait(500, _13_)
+    vim.wait(1000, _13_)
     return assert.is_nil(state.get("server-pid"))
   end
   it("can stop the server", _11_)
   local function _14_()
     client["start-server"]({host = "127.0.0.1", port = "9999"})
     local function _15_()
-      return false
+      return state.get("server-ready")
     end
-    vim.wait(1200, _15_)
+    vim.wait(2000, _15_)
     return assert.is_not_nil(state.get("server-pid"))
   end
   it("uses provided host and port", _14_)
   local function _16_()
     client["start-server"]({host = "127.0.0.1", port = test_port})
     local function _17_()
-      return false
+      return state.get("server-ready")
     end
-    vim.wait(1200, _17_)
+    vim.wait(2000, _17_)
     local pid1 = state.get("server-pid")
     assert.is_not_nil(pid1)
     client["stop-server"]()
     local function _18_()
-      return false
+      return (nil == state.get("server-pid"))
     end
-    vim.wait(500, _18_)
+    vim.wait(1000, _18_)
     assert.is_nil(state.get("server-pid"))
     client["start-server"]({host = "127.0.0.1", port = test_port})
     local function _19_()
-      return false
+      return state.get("server-ready")
     end
-    vim.wait(1200, _19_)
+    vim.wait(2000, _19_)
     local pid2 = state.get("server-pid")
     return assert.is_not_nil(pid2)
   end
