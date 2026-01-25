@@ -7,6 +7,14 @@
 (local ui (autoload :grapple.client.ui))
 (local debugger (autoload :grapple.client.debugger))
 
+(fn show-nls [s]
+  (let [with-arrows (string.gsub s "\r?\n" "↵\n")
+        lines (str.split with-arrows "\n")]
+    ; Remove empty last element if present (from trailing newline)
+    (when (and (> (length lines) 1) (= "" (n.last lines)))
+      (table.remove lines))
+    lines))
+
 (fn upcase [s n]
   (let [start (string.sub s 1 n)
         rest (string.sub s (+ n 1))]
@@ -58,7 +66,7 @@
     nil ; do nothing if no value to print
 
     (and (= "out" resp.tag) (= "out" resp.ch))
-    (log.append :stdout [resp.val])
+    (log.append :stdout (show-nls resp.val))
 
     (and (= "out" resp.tag) (= "err" resp.ch))
     (log.append :stderr [resp.val])

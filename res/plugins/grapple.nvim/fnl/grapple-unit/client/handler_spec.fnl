@@ -115,6 +115,19 @@
           (let [lines (. (. log-calls 1) :lines)]
             (assert.equals "Hello, world!" (. lines 1))))))
 
+    (it "handles env.eval messages with stdout containing newlines"
+      (fn []
+        (let [msg {:op "env.eval" :tag "out" :ch "out" :val "Line 1\nLine 2\nLine 3\n"}]
+          (handler.handle-message msg nil)
+          ;; Should log to stdout with newline arrows
+          (assert.equals 1 (length log-calls))
+          (assert.equals :stdout (. (. log-calls 1) :sec))
+          (let [lines (. (. log-calls 1) :lines)]
+            (assert.equals 3 (length lines))
+            (assert.equals "Line 1↵" (. lines 1))
+            (assert.equals "Line 2↵" (. lines 2))
+            (assert.equals "Line 3↵" (. lines 3))))))
+
     (it "handles env.eval messages with stderr"
       (fn []
         (let [msg {:op "env.eval" :tag "out" :ch "err" :val "Error occurred"}]

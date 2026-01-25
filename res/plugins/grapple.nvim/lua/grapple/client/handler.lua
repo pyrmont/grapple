@@ -8,6 +8,15 @@ local state = autoload("grapple.client.state")
 local str = autoload("conjure.nfnl.string")
 local ui = autoload("grapple.client.ui")
 local debugger = autoload("grapple.client.debugger")
+local function show_nls(s)
+  local with_arrows = string.gsub(s, "\r?\n", "\226\134\181\n")
+  local lines = str.split(with_arrows, "\n")
+  if ((#lines > 1) and ("" == n.last(lines))) then
+    table.remove(lines)
+  else
+  end
+  return lines
+end
 local function upcase(s, n0)
   local start = string.sub(s, 1, n0)
   local rest = string.sub(s, (n0 + 1))
@@ -63,7 +72,7 @@ local function handle_env_eval(resp, opts)
   if (nil == resp.val) then
     return nil
   elseif (("out" == resp.tag) and ("out" == resp.ch)) then
-    return log.append("stdout", {resp.val})
+    return log.append("stdout", show_nls(resp.val))
   elseif (("out" == resp.tag) and ("err" == resp.ch)) then
     return log.append("stderr", {resp.val})
   elseif ("cmd" == resp.tag) then
@@ -94,16 +103,16 @@ local function handle_env_doc(resp, action)
     local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _9_
+    local _10_
     if not resp["janet/sm"] then
-      _9_ = "\n"
+      _10_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _9_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _10_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _9_)
+    sm_info = (resp["janet/type"] .. "\n" .. _10_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -122,7 +131,7 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_win_set_option(win, "scrolloff", 0)
     vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
     vim.api.nvim_win_set_option(win, "breakindent", true)
-    local function _12_()
+    local function _13_()
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       else
@@ -130,7 +139,7 @@ local function handle_env_doc(resp, action)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _12_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _13_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
