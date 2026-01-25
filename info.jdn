@@ -20,7 +20,6 @@
                      "LICENSE"]}
             {:name "testament"
              :url "https://github.com/pyrmont/testament"
-             :tag "7ca0beaeb3885e4d2762953b473270af09cbf276"
              :prefix "deps/testament"
              :paths ["lib/testament.janet"
                      "init.janet"
