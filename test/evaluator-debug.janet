@@ -97,7 +97,8 @@
                    "janet/path" test-path
                    "janet/line" 1
                    "janet/col" 1
-                   "janet/reeval?" false})
+                   "janet/reeval?" false
+                   "janet/result" "15"})
   (def actual-ret (parser/produce p))
   (is (== expect-ret actual-ret))
   (is (not (parser/has-more p)))
@@ -226,7 +227,8 @@
                    "janet/path" test-path
                    "janet/line" 1
                    "janet/col" 1
-                   "janet/reeval?" false})
+                   "janet/reeval?" false
+                   "janet/result" "12"})
   (def actual-ret (parser/produce p))
   (is (== expect-ret actual-ret))
   (is (not (parser/has-more p)))
@@ -255,7 +257,8 @@
                  "janet/path" test-path
                  "janet/line" 1
                  "janet/col" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "10"})
   (def actual-1 (parser/produce p))
   (is (== expect-1 actual-1))
   (def expect-2 {"tag" "ret"
@@ -268,7 +271,8 @@
                  "janet/path" test-path
                  "janet/line" 2
                  "janet/col" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "15"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   (def expect-3 {"tag" "ret"
@@ -281,7 +285,8 @@
                  "janet/path" test-path
                  "janet/line" 3
                  "janet/col" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "15"})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -314,7 +319,8 @@
                  "janet/path" test-path
                  "janet/line" 1
                  "janet/col" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "20"})
   (def actual-1 (parser/produce p))
   (is (== expect-1 actual-1))
   # Second message should be a note about re-evaluating dependents
@@ -335,7 +341,8 @@
                  "done" false
                  "val" "25"
                  "janet/path" test-path
-                 "janet/reeval?" true})
+                 "janet/reeval?" true
+                 "janet/result" "25"})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p)))
@@ -376,7 +383,9 @@
                    "janet/path" test-path
                    "janet/line" 1
                    "janet/col" 1
-                   "janet/reeval?" false})
+                   "janet/reeval?" false
+                   "janet/result" {:type "function"
+                                   :value "<function test-fn>"}})
   (def actual-ret (parser/produce p))
   (is (== expect-ret actual-ret))
   # Second message should be the orphaned breakpoint command

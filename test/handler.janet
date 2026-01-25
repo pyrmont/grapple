@@ -879,6 +879,7 @@
                    "janet/line" 1
                    "janet/col" 1
                    "janet/reeval?" false
+                   "janet/result" (actual-run "janet/result")
                    "val" (actual-run "val")})
   (is (== expect-run actual-run))
   # Verify the result is a string (formatted stack data)
@@ -1146,6 +1147,7 @@
                     "janet/line" 1
                     "janet/col" 1
                     "janet/reeval?" false
+                    "janet/result" "6"
                     "val" "6"})
   (is (== expect-eval actual-eval))
   # Second response: debug code evaluation completing (from run)
@@ -1160,6 +1162,7 @@
                    "janet/line" 1
                    "janet/col" 1
                    "janet/reeval?" false
+                   "janet/result" (actual-run "janet/result")
                    "val" (actual-run "val")})
   (is (== expect-run actual-run))
   # Third response: env.dbg handler response

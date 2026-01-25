@@ -279,3 +279,74 @@
     (buffer/push-string buf "\n"))
   (buffer/push-string buf "\n")
   (string buf))
+
+(defn to-inspectable
+  "Converts a Janet value to a JSON-safe inspectable structure."
+  [value &opt opts]
+  (default opts {})
+  (def max-depth (get opts :max-depth 10))
+  (def visited (get opts :visited @{}))
+  (def depth (get opts :depth 0))
+  # Check depth limit
+  (when (>= depth max-depth)
+    (break {:type "truncated"}))
+  # recurring function
+  (defn recur [x]
+    (to-inspectable x (merge opts {:depth (inc depth) :visited visited})))
+  # Get the type of the value
+  (def val-type (type value))
+  (case val-type
+    # Arrays (check for circular references)
+    :array
+    (do
+      (if (in visited value)
+        {:type "circular" :to "array"}
+        (do
+          (put visited value true)
+          {:type "array"
+           :length (length value)
+           :els (map recur value)})))
+    # Tuples (check for circular references)
+    :tuple
+    (do
+      (if (in visited value)
+        {:type "circular" :to "tuple"}
+        (do
+          (put visited value true)
+          {:type "tuple"
+           :length (length value)
+           :els (map recur value)})))
+    # Tables (check for circular references)
+    :table
+    (do
+      (if (in visited value)
+        {:type "circular" :to "table"}
+        (do
+          (put visited value true)
+          (def keyvals @[])
+          (eachp [k v] value
+            (array/push keyvals (recur k))
+            (array/push keyvals (recur v)))
+          {:type "table"
+           :length (length value)
+           :kvs keyvals})))
+    # Structs
+    :struct
+    (do
+      (def keyvals @[])
+      (eachp [k v] value
+        (array/push keyvals (recur k))
+        (array/push keyvals (recur v)))
+      {:type "struct"
+       :length (length value)
+       :kvs keyvals})
+    # Simple types - format as Janet literals
+    :nil (string/format "%q" value)
+    :boolean (string/format "%q" value)
+    :number (string/format "%q" value)
+    :string (string/format "%q" value)
+    :symbol (string/format "%q" value)
+    :keyword (string/format "%q" value)
+    :buffer (string/format "%q" value)
+    # Default - unprintable types, include type information
+    {:type (string val-type) :value (string/format "%q" value)}))

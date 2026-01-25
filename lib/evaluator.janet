@@ -110,7 +110,9 @@
                "janet/line" line
                "janet/col" col
                # Mark as reevaluation if in a cascade
-               "janet/reeval?" reeval?}))
+               "janet/reeval?" reeval?
+               # Include structured representation for client-side inspection
+               "janet/result" (util/to-inspectable x)}))
       :debug
       (do
         (def stack (debug/stack f))

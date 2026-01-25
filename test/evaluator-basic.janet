@@ -46,7 +46,8 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" "3"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   (is (not (parser/has-more p))))
@@ -82,7 +83,8 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" "nil"})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -118,7 +120,8 @@
      "janet/path" u/ns
      "janet/line" 1
      "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" "nil"})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -157,7 +160,20 @@
      "janet/path" path
      "janet/line" 1
      "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" {:type "table"
+                     :length 2
+                     :kvs ["_"
+                           {:type "table"
+                            :length 1
+                            :kvs [":value"
+                                  {:type "circular"
+                                   :to "table"}]}
+                            "imported1/x"
+                            {:type "table"
+                             :length 1
+                             :kvs [":private"
+                                   "true"]}]}})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -196,7 +212,15 @@
      "janet/path" path
      "janet/line" 1
      "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" {:type "table"
+                     :length 1
+                     :kvs @["_"
+                            {:type "table"
+                             :length 1
+                             :kvs @[":value"
+                                    {:type "circular"
+                                     :to "table"}]}]}})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -271,7 +295,8 @@
                  "janet/path" u/ns
                  "janet/line" 1
                  "janet/col" 1
-     "janet/reeval?" false})
+     "janet/reeval?" false
+     "janet/result" {:type "function" :value "<function foo>"}})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   (def expect-msg "compile error: error: (macro) 1 called with 0 arguments, possibly expected 1")
@@ -343,7 +368,8 @@
                  "janet/path" u/ns
                  "janet/col" 1
                  "janet/line" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "1"})
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   (def expect-3 {"tag" "note"
@@ -367,7 +393,8 @@
                  "janet/path" u/ns
                  "janet/col" 23
                  "janet/line" 1
-                 "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "2"})
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
   (is (not (parser/has-more p))))

@@ -39,9 +39,10 @@
   (def res (resume fib))
   [res fib])
 
-(defn ret-msg [val &named path col line reeval? done?]
+(defn ret-msg [val &named path col line reeval? result done?]
   (default path u/ns)
   (default reeval? false)
+  (default result val)
   (default done? false)
   {"tag" "ret"
    "op" "env.eval"
@@ -53,7 +54,8 @@
    "janet/path" path
    "janet/line" line
    "janet/col" col
-   "janet/reeval?" reeval?})
+   "janet/reeval?" reeval?
+   "janet/result" result})
 
 (defn cross-msg [path & depts]
   (def val (string "Re-evaluating in "
@@ -220,7 +222,9 @@
   # Parse and verify messages
   (parser/consume p outb)
   # Return from macro redefinition
-  (def expect-1 (ret-msg "<function double>" :line 1 :col 1))
+  (def expect-1-res
+    {:type "function" :value "<function double>"})
+  (def expect-1 (ret-msg "<function double>" :line 1 :col 1 :result expect-1-res))
   (def actual-1 (parser/produce p))
   (is (== expect-1 actual-1))
   # Note about re-evaluation
@@ -251,7 +255,8 @@
   (def actual-5 (parser/produce p))
   (is (== expect-5 actual-5))
   # Return from re-evaluating mult
-  (def expect-6 (ret-msg "<function mult>" :reeval? true))
+  (def expect-6-res {:type "function" :value "<function mult>"})
+  (def expect-6 (ret-msg "<function mult>" :reeval? true :result expect-6-res))
   (def actual-6 (parser/produce p))
   (is (== expect-6 actual-6))
   # Return from re-evaluating z
@@ -512,7 +517,9 @@
   (buffer/clear outb)
   (run-eval "(def z '(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-3 (ret-msg "(+ x 5)" :line 1 :col 1))
+  (def expect-3-res
+    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+  (def expect-3 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-3-res))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   # No more messages
@@ -521,7 +528,9 @@
   (buffer/clear outb)
   (run-eval "(def z '(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-4 (ret-msg "(+ x 5)" :line 1 :col 1))
+  (def expect-4-res
+    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+  (def expect-4 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-4-res))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
   # No more messages
@@ -532,7 +541,9 @@
   (buffer/clear outb)
   (run-eval "(def tuple-quote '(a b))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-5 (ret-msg "(a b)" :line 1 :col 1))
+  (def expect-5-res
+    {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-5 (ret-msg "(a b)" :line 1 :col 1 :result expect-5-res))
   (def actual-5 (parser/produce p))
   (is (== expect-5 actual-5))
   # No more messages
@@ -540,7 +551,9 @@
   (buffer/clear outb)
   (run-eval "(def array-quote '[a b])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-6 (ret-msg "[a b]" :line 1 :col 1))
+  (def expect-6-res
+    {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-6 (ret-msg "[a b]" :line 1 :col 1 :result expect-6-res))
   (def actual-6 (parser/produce p))
   (is (== expect-6 actual-6))
   # No more messages
@@ -550,7 +563,8 @@
   (buffer/clear outb)
   (run-eval "(def tuple-quote '(a b))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-7 (ret-msg "(a b)" :line 1 :col 1))
+  (def expect-7-res {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-7 (ret-msg "(a b)" :line 1 :col 1 :result expect-7-res))
   (def actual-7 (parser/produce p))
   (is (== expect-7 actual-7))
   # No more messages
@@ -558,7 +572,8 @@
   (buffer/clear outb)
   (run-eval "(def array-quote '[a b])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-8 (ret-msg "[a b]" :line 1 :col 1))
+  (def expect-8-res {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-8 (ret-msg "[a b]" :line 1 :col 1 :result expect-8-res))
   (def actual-8 (parser/produce p))
   (is (== expect-8 actual-8))
   # No more messages
@@ -567,7 +582,9 @@
   (buffer/clear outb)
   (run-eval "(def quasi1 ~(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-9 (ret-msg "(+ x 5)" :line 1 :col 1))
+  (def expect-9-res
+    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+  (def expect-9 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-9-res))
   (def actual-9 (parser/produce p))
   (is (== expect-9 actual-9))
   # No more messages
@@ -576,7 +593,8 @@
   (buffer/clear outb)
   (run-eval "(def quasi1 ~(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-10 (ret-msg "(+ x 5)" :line 1 :col 1))
+  (def expect-10-res {:type "tuple" :length 3 :els ["+" "x" "5"]})
+  (def expect-10 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-10-res))
   (def actual-10 (parser/produce p))
   (is (== expect-10 actual-10))
   # No more messages
@@ -585,7 +603,9 @@
   (buffer/clear outb)
   (run-eval "(def quasi2 ~(+ ,x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-11 (ret-msg "(+ 40 5)" :line 1 :col 1))
+  (def expect-11-res
+    {:type "tuple" :length 3 :els ["+" "40" "5"]})
+  (def expect-11 (ret-msg "(+ 40 5)" :line 1 :col 1 :result expect-11-res))
   (def actual-11 (parser/produce p))
   (is (== expect-11 actual-11))
   # No more messages
@@ -614,7 +634,13 @@
   (buffer/clear outb)
   (run-eval "(def nested '(+ a '(* b c)))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-15 (ret-msg "(+ a (quote (* b c)))" :line 1 :col 1))
+  (def expect-15-res
+   {:type "tuple" :length 3 :els @["+" "a" {:type "tuple"
+                                               :length 2
+                                               :els @["quote" {:type "tuple"
+                                                                  :length 3
+                                                                  :els @["*" "b" "c"]}]}]})
+  (def expect-15 (ret-msg "(+ a (quote (* b c)))" :line 1 :col 1 :result expect-15-res))
   (def actual-15 (parser/produce p))
   (is (== expect-15 actual-15))
   # Verify no more messages
@@ -632,7 +658,8 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-17 (ret-msg "(8 x)" :line 1 :col 1))
+  (def expect-17-res {:type "tuple" :length 2 :els ["8" "x"]})
+  (def expect-17 (ret-msg "(8 x)" :line 1 :col 1 :result expect-17-res))
   (def actual-17 (parser/produce p))
   (is (== expect-17 actual-17))
   # Verify no more messages
@@ -642,7 +669,8 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-18 (ret-msg "(9 x)" :line 1 :col 1))
+  (def expect-18-res {:type "tuple" :length 2 :els ["9" "x"]})
+  (def expect-18 (ret-msg "(9 x)" :line 1 :col 1 :result expect-18-res))
   (def actual-18 (parser/produce p))
   (is (== expect-18 actual-18))
   # x changes, mixed should NOT update (quoted x)
@@ -650,7 +678,8 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-19 (ret-msg "(9 x)" :line 1 :col 1))
+  (def expect-19-res {:type "tuple" :length 2 :els ["9" "x"]})
+  (def expect-19 (ret-msg "(9 x)" :line 1 :col 1 :result expect-19-res))
   (def actual-19 (parser/produce p))
   (is (== expect-19 actual-19))
   # Verify no more messages
@@ -688,7 +717,7 @@
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   # Messages for re-evaluating dependents: result2, result3, z, result1
-  (def expect-4 (ret-msg "<function f>" :reeval? true))
+  (def expect-4 (ret-msg "<function f>" :reeval? true :result {:type "function" :value "<function f>"}))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
   (def expect-5 (ret-msg "305" :reeval? true))
@@ -730,7 +759,7 @@
   (def expect-9 (dep-msg "default2" "h" "result6" "result5" "result7"))
   (def actual-9 (parser/produce p))
   (is (== expect-9 actual-9))
-  (def expect-10 (ret-msg "<function h>" :reeval? true))
+  (def expect-10 (ret-msg "<function h>" :reeval? true :result {:type "function" :value "<function h>"}))
   (def actual-10 (parser/produce p))
   (is (== expect-10 actual-10))
   (def expect-11 (ret-msg "303" :reeval? true))
@@ -773,7 +802,7 @@
   (def expect-16 (dep-msg "key-default" "with-keys" "result10" "result9"))
   (def actual-16 (parser/produce p))
   (is (== expect-16 actual-16))
-  (def expect-17 (ret-msg "<function with-keys>" :reeval? true))
+  (def expect-17 (ret-msg "<function with-keys>" :reeval? true :result {:type "function" :value "<function with-keys>"}))
   (def actual-17 (parser/produce p))
   (is (== expect-17 actual-17))
   (def expect-18 (ret-msg "201" :reeval? true))
@@ -800,7 +829,7 @@
   (def expect-21 (dep-msg "named-default" "with-named" "result12" "result11"))
   (def actual-21 (parser/produce p))
   (is (== expect-21 actual-21))
-  (def expect-22 (ret-msg "<function with-named>" :reeval? true))
+  (def expect-22 (ret-msg "<function with-named>" :reeval? true :result {:type "function" :value "<function with-named>"}))
   (def actual-22 (parser/produce p))
   (is (== expect-22 actual-22))
   (def expect-23 (ret-msg "101" :reeval? true))
@@ -838,13 +867,13 @@
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   # Return from re-evaluating outer
-  (def expect-3 (ret-msg "<function outer>" :reeval? true))
+  (def expect-3 (ret-msg "<function outer>" :reeval? true :result {:type "function" :value "<function outer>"}))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   # Return from re-evaluating inner
-  (def expect-4 (ret-msg nil :reeval? true))
   (def actual-4 (parser/produce p))
-  (is (== (merge expect-4 {"val" (actual-4 "val")}) actual-4))
+  (def expect-4 (ret-msg (actual-4 "val") :reeval? true :result {:type "function" :value (actual-4 "val")}))
+  (is (== expect-4 actual-4))
   # Return from re-evaluating result1
   (def expect-5 (ret-msg "20" :reeval? true))
   (def actual-5 (parser/produce p))
@@ -876,11 +905,15 @@
   (def actual-2 (parser/produce p))
   (is (== expect-2 actual-2))
   # Return from re-evaluating b
-  (def expect-3 (ret-msg "(100 20)" :reeval? true))
+  (def expect-3-res
+    {:type "tuple" :length 2 :els ["100" "20"]})
+  (def expect-3 (ret-msg "(100 20)" :reeval? true :result expect-3-res))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   # Return from re-evaluating a
-  (def expect-4 (ret-msg "(100 20)" :reeval? true))
+  (def expect-4-res
+    {:type "tuple" :length 2 :els ["100" "20"]})
+  (def expect-4 (ret-msg "(100 20)" :reeval? true :result expect-4-res))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
   # Verify no more messages
@@ -894,7 +927,9 @@
   # Parse and verify messages
   (parser/consume p outb)
   # Return from data redefinition
-  (def expect-5 (ret-msg "{:bar 20 :foo 10}" :line 1 :col 1))
+  (def expect-5-res
+    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+  (def expect-5 (ret-msg "{:bar 20 :foo 10}" :line 1 :col 1 :result expect-5-res))
   (def actual-5 (parser/produce p))
   (is (== expect-5 actual-5))
   # Note about re-evaluation
@@ -902,11 +937,15 @@
   (def actual-6 (parser/produce p))
   (is (== expect-6 actual-6))
   # Return from re-evaluating b
-  (def expect-7 (ret-msg "{:bar 20 :foo 10}" :reeval? true))
+  (def expect-7-res
+    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+  (def expect-7 (ret-msg "{:bar 20 :foo 10}" :reeval? true :result expect-7-res))
   (def actual-7 (parser/produce p))
   (is (== expect-7 actual-7))
   # Return from re-evaluating f
-  (def expect-8 (ret-msg "{:bar 20 :foo 10}" :reeval? true))
+  (def expect-8-res
+    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+  (def expect-8 (ret-msg "{:bar 20 :foo 10}" :reeval? true :result expect-8-res))
   (def actual-8 (parser/produce p))
   (is (== expect-8 actual-8))
   # Verify no more messages
@@ -1049,7 +1088,7 @@
   (def expect-3 (dep-msg "a" "g" "b"))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (def expect-4 (ret-msg "<function g>" :reeval? true))
+  (def expect-4 (ret-msg "<function g>" :reeval? true :result {:type "function" :value "<function g>"}))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
   (def expect-5 (ret-msg "110" :reeval? true))
@@ -1168,15 +1207,15 @@
   (def expect-3 (dep-msg "d" "c" "b" "a"))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
-  (def expect-2 (ret-msg "120" :reeval? true))
-  (def actual-2 (parser/produce p))
-  (is (== expect-2 actual-2))
-  (def expect-3 (ret-msg "110" :reeval? true))
-  (def actual-3 (parser/produce p))
-  (is (== expect-3 actual-3))
-  (def expect-4 (ret-msg "230" :reeval? true))
+  (def expect-4 (ret-msg "120" :reeval? true))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
+  (def expect-5 (ret-msg "110" :reeval? true))
+  (def actual-5 (parser/produce p))
+  (is (== expect-5 actual-5))
+  (def expect-6 (ret-msg "230" :reeval? true))
+  (def actual-6 (parser/produce p))
+  (is (== expect-6 actual-6))
   # Verify no more messages
   (is (not (parser/has-more p))))
 

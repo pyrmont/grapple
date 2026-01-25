@@ -145,7 +145,8 @@
                  "janet/path" "<mrepl>"
                  "janet/line" 1
                  "janet/col" 1
-     "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "5"})
   (is (== expect-3 actual-3))
   (def actual-4 (recv))
   (def expect-4 {"tag" "ret"
@@ -172,7 +173,8 @@
                  "janet/path" "<mrepl>"
                  "janet/line" 1
                  "janet/col" 1
-     "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" "6"})
   (is (== expect-5 actual-5))
   (def actual-6 (recv))
   (def expect-6 {"tag" "ret"
@@ -199,7 +201,9 @@
                  "janet/path" "<mrepl>"
                  "janet/line" 1
                  "janet/col" 1
-     "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" {"type" "function"
+                                 "value" "<function x>"}})
   (is (== expect-7 actual-7))
   (def actual-8 (recv))
   (def expect-8 {"tag" "out"
@@ -221,7 +225,8 @@
                  "janet/path" "<mrepl>"
                  "janet/line" 1
                  "janet/col" 31
-     "janet/reeval?" false})
+                 "janet/reeval?" false
+                 "janet/result" ":bar"})
   (is (== expect-9 actual-9))
   (def actual-10 (recv))
   (def expect-10 {"tag" "ret"
