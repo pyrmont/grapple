@@ -22,6 +22,68 @@ local function upcase(s, n0)
   local rest = string.sub(s, (n0 + 1))
   return (string.upper(start) .. rest)
 end
+local function render_janet_value(janet_result, st)
+  if (type(janet_result) == "string") then
+    return janet_result
+  elseif ((type(janet_result) == "table") and janet_result.type) then
+    local result_type = janet_result.type
+    local result_count = (janet_result.count or 0)
+    local result_length = (janet_result.length or 0)
+    if ((result_length > 50) and (result_count > 20)) then
+      local counter = (st["result-counter"] + 1)
+      local id_str = string.format("%04x", counter)
+      n.assoc(st, "result-counter", counter)
+      n.assoc(st["id-to-val"], id_str, janet_result)
+      return ("<" .. result_type .. "-" .. id_str .. " count:" .. result_count .. ">")
+    else
+      if (result_type == "array") then
+        local function _3_(_241)
+          return render_janet_value(_241, st)
+        end
+        return ("@[" .. str.join(" ", n.map(_3_, (janet_result.els or {}))) .. "]")
+      elseif (result_type == "tuple") then
+        local function _4_(_241)
+          return render_janet_value(_241, st)
+        end
+        return ("[" .. str.join(" ", n.map(_4_, (janet_result.els or {}))) .. "]")
+      elseif (result_type == "struct") then
+        local kvs = (janet_result.kvs or {})
+        local pairs = {}
+        for i = 1, #kvs, 2 do
+          local k = kvs[i]
+          local v = kvs[(i + 1)]
+          table.insert(pairs, (render_janet_value(k, st) .. " " .. render_janet_value(v, st)))
+        end
+        return ("{" .. str.join(" ", pairs) .. "}")
+      elseif (result_type == "table") then
+        local kvs = (janet_result.kvs or {})
+        local pairs = {}
+        for i = 1, #kvs, 2 do
+          local k = kvs[i]
+          local v = kvs[(i + 1)]
+          table.insert(pairs, (render_janet_value(k, st) .. " " .. render_janet_value(v, st)))
+        end
+        return ("@{" .. str.join(" ", pairs) .. "}")
+      else
+        local _ = result_type
+        return janet_result.value
+      end
+    end
+  else
+    return nil
+  end
+end
+local function render_result(resp)
+  local val = (resp.val or "")
+  local janet_result = resp["janet/result"]
+  if (#val < 50) then
+    return val
+  elseif janet_result then
+    return render_janet_value(janet_result, state.get())
+  else
+    return val
+  end
+end
 local function error_msg_3f(msg)
   return ("err" == msg.tag)
 end
@@ -82,18 +144,28 @@ local function handle_env_eval(resp, opts)
   elseif (("sig" == resp.tag) and ("debug" == resp.val)) then
     return debugger["handle-signal"](resp)
   elseif (("ret" == resp.tag) and (nil ~= resp.val)) then
-    if (opts["on-result"] and not resp["janet/reeval?"]) then
-      opts["on-result"](resp.val)
+    local rendered = render_result(resp)
+    if rendered then
+      if (opts["on-result"] and not resp["janet/reeval?"]) then
+        opts["on-result"](rendered)
+      else
+      end
+      return log.append("result", {rendered})
     else
+      return log.append("error", {"Failed to render result: unexpected janet/result structure"})
     end
-    return log.append("result", {resp.val})
   else
     return nil
   end
 end
 local function handle_env_dbg(resp, opts)
   if (("ret" == resp.tag) and (nil ~= resp.val)) then
-    return log.append("result", {resp.val})
+    local rendered = render_result(resp)
+    if rendered then
+      return log.append("result", {rendered})
+    else
+      return log.append("error", {"Failed to render result: unexpected janet/result structure"})
+    end
   else
     return handle_env_eval(resp, opts)
   end
@@ -103,16 +175,16 @@ local function handle_env_doc(resp, action)
     local src_buf = vim.api.nvim_get_current_buf()
     local buf = vim.api.nvim_create_buf(false, true)
     local sm_info
-    local _10_
+    local _18_
     if not resp["janet/sm"] then
-      _10_ = "\n"
+      _18_ = "\n"
     else
       local path = resp["janet/sm"][1]
       local line = resp["janet/sm"][2]
       local col = resp["janet/sm"][3]
-      _10_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
+      _18_ = (path .. " on line " .. line .. ", column " .. col .. "\n\n")
     end
-    sm_info = (resp["janet/type"] .. "\n" .. _10_)
+    sm_info = (resp["janet/type"] .. "\n" .. _18_)
     local lines = str.split((sm_info .. resp.val), "\n")
     local _ = vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
     local width = 50
@@ -131,7 +203,7 @@ local function handle_env_doc(resp, action)
     vim.api.nvim_win_set_option(win, "scrolloff", 0)
     vim.api.nvim_win_set_option(win, "sidescrolloff", 0)
     vim.api.nvim_win_set_option(win, "breakindent", true)
-    local function _13_()
+    local function _21_()
       if vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_close(win, true)
       else
@@ -139,7 +211,7 @@ local function handle_env_doc(resp, action)
       vim.api.nvim_buf_delete(buf, {force = true})
       return nil
     end
-    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _13_})
+    return vim.api.nvim_create_autocmd("CursorMoved", {buffer = src_buf, once = true, callback = _21_})
   elseif ("def" == action) then
     local path = resp["janet/sm"][1]
     local line = resp["janet/sm"][2]
@@ -193,7 +265,12 @@ local function handle_brk_clr(resp)
 end
 local function handle_brk_list(resp, opts)
   if ("ret" == resp.tag) then
-    return log.append("result", {resp.val})
+    local rendered = render_result(resp)
+    if rendered then
+      return log.append("result", {rendered})
+    else
+      return log.append("error", {"Failed to render result: unexpected janet/result structure"})
+    end
   elseif ("err" == resp.tag) then
     return display_error(("Failed to list breakpoints: " .. resp.val), resp)
   else

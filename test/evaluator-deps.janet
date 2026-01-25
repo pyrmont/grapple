@@ -518,7 +518,7 @@
   (run-eval "(def z '(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-3-res
-    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+    {:type "tuple" :count 3 :length 7 :els @["+" "x" "5"]})
   (def expect-3 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-3-res))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
@@ -529,7 +529,7 @@
   (run-eval "(def z '(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-4-res
-    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+    {:type "tuple" :count 3 :length 7 :els @["+" "x" "5"]})
   (def expect-4 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-4-res))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
@@ -542,7 +542,7 @@
   (run-eval "(def tuple-quote '(a b))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-5-res
-    {:type "tuple" :length 2 :els ["a" "b"]})
+    {:type "tuple" :count 2 :length 5 :els @["a" "b"]})
   (def expect-5 (ret-msg "(a b)" :line 1 :col 1 :result expect-5-res))
   (def actual-5 (parser/produce p))
   (is (== expect-5 actual-5))
@@ -552,7 +552,7 @@
   (run-eval "(def array-quote '[a b])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-6-res
-    {:type "tuple" :length 2 :els ["a" "b"]})
+    {:type "tuple" :count 2 :length 5 :els @["a" "b"]})
   (def expect-6 (ret-msg "[a b]" :line 1 :col 1 :result expect-6-res))
   (def actual-6 (parser/produce p))
   (is (== expect-6 actual-6))
@@ -563,7 +563,7 @@
   (buffer/clear outb)
   (run-eval "(def tuple-quote '(a b))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-7-res {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-7-res {:type "tuple" :count 2 :length 5 :els @["a" "b"]})
   (def expect-7 (ret-msg "(a b)" :line 1 :col 1 :result expect-7-res))
   (def actual-7 (parser/produce p))
   (is (== expect-7 actual-7))
@@ -572,7 +572,7 @@
   (buffer/clear outb)
   (run-eval "(def array-quote '[a b])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-8-res {:type "tuple" :length 2 :els ["a" "b"]})
+  (def expect-8-res {:type "tuple" :count 2 :length 5 :els @["a" "b"]})
   (def expect-8 (ret-msg "[a b]" :line 1 :col 1 :result expect-8-res))
   (def actual-8 (parser/produce p))
   (is (== expect-8 actual-8))
@@ -583,7 +583,7 @@
   (run-eval "(def quasi1 ~(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-9-res
-    {:type "tuple" :length 3 :els ["+" "x" "5"]})
+    {:type "tuple" :count 3 :length 7 :els @["+" "x" "5"]})
   (def expect-9 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-9-res))
   (def actual-9 (parser/produce p))
   (is (== expect-9 actual-9))
@@ -593,7 +593,7 @@
   (buffer/clear outb)
   (run-eval "(def quasi1 ~(+ x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-10-res {:type "tuple" :length 3 :els ["+" "x" "5"]})
+  (def expect-10-res {:type "tuple" :count 3 :length 7 :els @["+" "x" "5"]})
   (def expect-10 (ret-msg "(+ x 5)" :line 1 :col 1 :result expect-10-res))
   (def actual-10 (parser/produce p))
   (is (== expect-10 actual-10))
@@ -604,7 +604,7 @@
   (run-eval "(def quasi2 ~(+ ,x 5))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-11-res
-    {:type "tuple" :length 3 :els ["+" "40" "5"]})
+    {:type "tuple" :count 3 :length 8 :els @["+" "40" "5"]})
   (def expect-11 (ret-msg "(+ 40 5)" :line 1 :col 1 :result expect-11-res))
   (def actual-11 (parser/produce p))
   (is (== expect-11 actual-11))
@@ -635,11 +635,13 @@
   (run-eval "(def nested '(+ a '(* b c)))" :env env :send send :req req :sess sess)
   (parser/consume p outb)
   (def expect-15-res
-   {:type "tuple" :length 3 :els @["+" "a" {:type "tuple"
-                                               :length 2
-                                               :els @["quote" {:type "tuple"
-                                                                  :length 3
-                                                                  :els @["*" "b" "c"]}]}]})
+   {:type "tuple" :count 3 :length 21 :els @["+" "a" {:type "tuple"
+                                                         :count 2
+                                                         :length 15
+                                                         :els @["quote" {:type "tuple"
+                                                                           :count 3
+                                                                           :length 7
+                                                                           :els @["*" "b" "c"]}]}]})
   (def expect-15 (ret-msg "(+ a (quote (* b c)))" :line 1 :col 1 :result expect-15-res))
   (def actual-15 (parser/produce p))
   (is (== expect-15 actual-15))
@@ -658,7 +660,7 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-17-res {:type "tuple" :length 2 :els ["8" "x"]})
+  (def expect-17-res {:type "tuple" :count 2 :length 5 :els @["8" "x"]})
   (def expect-17 (ret-msg "(8 x)" :line 1 :col 1 :result expect-17-res))
   (def actual-17 (parser/produce p))
   (is (== expect-17 actual-17))
@@ -669,7 +671,7 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-18-res {:type "tuple" :length 2 :els ["9" "x"]})
+  (def expect-18-res {:type "tuple" :count 2 :length 5 :els @["9" "x"]})
   (def expect-18 (ret-msg "(9 x)" :line 1 :col 1 :result expect-18-res))
   (def actual-18 (parser/produce p))
   (is (== expect-18 actual-18))
@@ -678,7 +680,7 @@
   (buffer/clear outb)
   (run-eval "(def mixed [d 'x])" :env env :send send :req req :sess sess)
   (parser/consume p outb)
-  (def expect-19-res {:type "tuple" :length 2 :els ["9" "x"]})
+  (def expect-19-res {:type "tuple" :count 2 :length 5 :els @["9" "x"]})
   (def expect-19 (ret-msg "(9 x)" :line 1 :col 1 :result expect-19-res))
   (def actual-19 (parser/produce p))
   (is (== expect-19 actual-19))
@@ -906,13 +908,13 @@
   (is (== expect-2 actual-2))
   # Return from re-evaluating b
   (def expect-3-res
-    {:type "tuple" :length 2 :els ["100" "20"]})
+    {:type "tuple" :count 2 :length 8 :els @["100" "20"]})
   (def expect-3 (ret-msg "(100 20)" :reeval? true :result expect-3-res))
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   # Return from re-evaluating a
   (def expect-4-res
-    {:type "tuple" :length 2 :els ["100" "20"]})
+    {:type "tuple" :count 2 :length 8 :els @["100" "20"]})
   (def expect-4 (ret-msg "(100 20)" :reeval? true :result expect-4-res))
   (def actual-4 (parser/produce p))
   (is (== expect-4 actual-4))
@@ -928,7 +930,7 @@
   (parser/consume p outb)
   # Return from data redefinition
   (def expect-5-res
-    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+    {:type "struct" :count 2 :length 17 :kvs @[":foo" "10" ":bar" "20"]})
   (def expect-5 (ret-msg "{:bar 20 :foo 10}" :line 1 :col 1 :result expect-5-res))
   (def actual-5 (parser/produce p))
   (is (== expect-5 actual-5))
@@ -938,13 +940,13 @@
   (is (== expect-6 actual-6))
   # Return from re-evaluating b
   (def expect-7-res
-    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+    {:type "struct" :count 2 :length 17 :kvs @[":foo" "10" ":bar" "20"]})
   (def expect-7 (ret-msg "{:bar 20 :foo 10}" :reeval? true :result expect-7-res))
   (def actual-7 (parser/produce p))
   (is (== expect-7 actual-7))
   # Return from re-evaluating f
   (def expect-8-res
-    {:type "struct" :length 2 :kvs [":foo" "10" ":bar" "20"]})
+    {:type "struct" :count 2 :length 17 :kvs @[":foo" "10" ":bar" "20"]})
   (def expect-8 (ret-msg "{:bar 20 :foo 10}" :reeval? true :result expect-8-res))
   (def actual-8 (parser/produce p))
   (is (== expect-8 actual-8))

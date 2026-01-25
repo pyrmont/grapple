@@ -304,7 +304,8 @@
         (do
           (put visited value true)
           {:type "array"
-           :length (length value)
+           :count (length value)
+           :length (length (string/format "%q" value))
            :els (map recur value)})))
     # Tuples (check for circular references)
     :tuple
@@ -314,7 +315,8 @@
         (do
           (put visited value true)
           {:type "tuple"
-           :length (length value)
+           :count (length value)
+           :length (length (string/format "%q" value))
            :els (map recur value)})))
     # Tables (check for circular references)
     :table
@@ -328,7 +330,8 @@
             (array/push keyvals (recur k))
             (array/push keyvals (recur v)))
           {:type "table"
-           :length (length value)
+           :count (length value)
+           :length (length (string/format "%q" value))
            :kvs keyvals})))
     # Structs
     :struct
@@ -338,7 +341,8 @@
         (array/push keyvals (recur k))
         (array/push keyvals (recur v)))
       {:type "struct"
-       :length (length value)
+       :count (length value)
+       :length (length (string/format "%q" value))
        :kvs keyvals})
     # Simple types - format as Janet literals
     :nil (string/format "%q" value)

@@ -162,18 +162,21 @@
      "janet/col" 1
      "janet/reeval?" false
      "janet/result" {:type "table"
-                     :length 2
-                     :kvs ["_"
-                           {:type "table"
-                            :length 1
-                            :kvs [":value"
-                                  {:type "circular"
-                                   :to "table"}]}
+                     :count 2
+                     :length 53
+                     :kvs @["_"
+                            {:type "table"
+                             :count 1
+                             :length 53
+                             :kvs @[":value"
+                                    {:type "circular"
+                                     :to "table"}]}
                             "imported1/x"
                             {:type "table"
-                             :length 1
-                             :kvs [":private"
-                                   "true"]}]}})
+                             :count 1
+                             :length 16
+                             :kvs @[":private"
+                                    "true"]}]}})
   (def actual-3 (parser/produce p))
   (is (== expect-3 actual-3))
   (is (not (parser/has-more p))))
@@ -214,10 +217,12 @@
      "janet/col" 1
      "janet/reeval?" false
      "janet/result" {:type "table"
-                     :length 1
+                     :count 1
+                     :length 24
                      :kvs @["_"
                             {:type "table"
-                             :length 1
+                             :count 1
+                             :length 24
                              :kvs @[":value"
                                     {:type "circular"
                                      :to "table"}]}]}})

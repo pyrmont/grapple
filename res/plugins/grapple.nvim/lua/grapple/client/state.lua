@@ -4,7 +4,7 @@ local autoload = _local_1_.autoload
 local client = autoload("conjure.client")
 local get
 local function _2_()
-  return {conn = nil, ["server-pid"] = nil, ["server-port"] = nil, token = nil, breakpoints = {}, ["debug-position"] = nil, ["original-signcol-hl"] = nil, ["server-ready"] = false}
+  return {conn = nil, ["server-pid"] = nil, ["server-port"] = nil, token = nil, breakpoints = {}, ["debug-position"] = nil, ["original-signcol-hl"] = nil, ["result-counter"] = 0, ["val-to-id"] = {}, ["id-to-val"] = {}, ["server-ready"] = false}
 end
 get = client["new-state"](_2_)
 return {get = get}

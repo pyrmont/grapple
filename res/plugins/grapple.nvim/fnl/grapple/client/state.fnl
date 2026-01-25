@@ -11,6 +11,9 @@
        :server-ready false
        :breakpoints {}
        :debug-position nil
-       :original-signcol-hl nil})))
+       :original-signcol-hl nil
+       :result-counter 0
+       :val-to-id {}
+       :id-to-val {}})))
 
 {: get}

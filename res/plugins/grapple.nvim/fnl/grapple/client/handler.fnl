@@ -20,6 +20,73 @@
         rest (string.sub s (+ n 1))]
     (.. (string.upper start) rest)))
 
+(fn render-janet-value [janet-result st]
+  "Recursively renders janet/result, eliding complex types with > 20 elements"
+  (if
+    ; Simple type - already a string
+    (= (type janet-result) "string")
+    janet-result
+    ; Complex type
+    (and (= (type janet-result) "table")
+         (. janet-result :type))
+    (let [result-type (. janet-result :type)
+          result-count (or (. janet-result :count) 0)
+          result-length (or (. janet-result :length) 0)]
+      (if
+        ; Three-step heuristic:
+        ; 1. if length <= 50: render fully
+        ; 2. if length > 50 and count > 20: elide
+        ; 3. if length > 50 but count <= 20: render and recurse
+        (and (> result-length 50) (> result-count 20))
+        (let [counter (+ (. st :result-counter) 1)
+              id-str (string.format "%04x" counter)]
+          (n.assoc st :result-counter counter)
+          (n.assoc (. st :id-to-val) id-str janet-result)
+          (.. "<" result-type "-" id-str " count:" result-count ">"))
+        ; Otherwise render normally based on type
+        (case result-type
+          "array"
+          (.. "@[" (str.join " " (n.map #(render-janet-value $ st) (or (. janet-result :els) []))) "]")
+          "tuple"
+          (.. "[" (str.join " " (n.map #(render-janet-value $ st) (or (. janet-result :els) []))) "]")
+          "struct"
+          (let [kvs (or (. janet-result :kvs) [])
+                pairs []]
+            (for [i 1 (length kvs) 2]
+              (let [k (. kvs i)
+                    v (. kvs (+ i 1))]
+                (table.insert pairs (.. (render-janet-value k st) " " (render-janet-value v st)))))
+            (.. "{" (str.join " " pairs) "}"))
+          "table"
+          (let [kvs (or (. janet-result :kvs) [])
+                pairs []]
+            (for [i 1 (length kvs) 2]
+              (let [k (. kvs i)
+                    v (. kvs (+ i 1))]
+                (table.insert pairs (.. (render-janet-value k st) " " (render-janet-value v st)))))
+            (.. "@{" (str.join " " pairs) "}"))
+          ; Unknown type - return the :value field
+          _
+          (. janet-result :value))))
+    ; Not a string or complex type - shouldn't happen, return nil
+    nil))
+
+(fn render-result [resp]
+  "Renders a result value, truncating complex types and returning a display string"
+  (let [val (or resp.val "")
+        janet-result (. resp "janet/result")]
+    (if
+      ; If val is short enough, just display it
+      (< (length val) 50)
+      val
+
+      ; If janet/result exists, try selective rendering
+      janet-result
+      (render-janet-value janet-result (state.get))
+
+      ; Otherwise, display val
+      val)))
+
 (fn error-msg? [msg]
   (= "err" msg.tag))
 
@@ -83,16 +150,23 @@
     (and (= "ret" resp.tag) (not= nil resp.val))
     (do
       ; Only show virtual text for primary results (not cascaded reevaluations)
-      (when (and opts.on-result (not (. resp "janet/reeval?")))
-        (opts.on-result resp.val))
-      (log.append :result [resp.val]))))
+      (let [rendered (render-result resp)]
+        (if rendered
+          (do
+            (when (and opts.on-result (not (. resp "janet/reeval?")))
+              (opts.on-result rendered))
+            (log.append :result [rendered]))
+          (log.append :error ["Failed to render result: unexpected janet/result structure"]))))))
 
 (fn handle-env-dbg [resp opts]
   "Handles env.dbg responses (debug commands), logging ret to debug section"
   (if
     ; For debug commands, log return values to debug section (not result)
     (and (= "ret" resp.tag) (not= nil resp.val))
-    (log.append :result [resp.val])
+    (let [rendered (render-result resp)]
+      (if rendered
+        (log.append :result [rendered])
+        (log.append :error ["Failed to render result: unexpected janet/result structure"])))
 
     ; Delegate everything else to handle-env-eval
     (handle-env-eval resp opts)))
@@ -183,7 +257,10 @@
 (fn handle-brk-list [resp opts]
   (if
     (= "ret" resp.tag)
-    (log.append :result [resp.val])
+    (let [rendered (render-result resp)]
+      (if rendered
+        (log.append :result [rendered])
+        (log.append :error ["Failed to render result: unexpected janet/result structure"])))
     (= "err" resp.tag)
     (display-error (.. "Failed to list breakpoints: " resp.val) resp)))
 

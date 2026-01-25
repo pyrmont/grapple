@@ -40,45 +40,46 @@
 
 (deftest array-empty
   (def actual (util/to-inspectable @[]))
-  (def expect {:type "array" :length 0 :els []})
+  (def expect {:type "array" :count 0 :length 3 :els @[]})
   (is (== expect actual)))
 
 (deftest array-simple
   (def actual (util/to-inspectable @[1 2 3]))
-  (def expect {:type "array" :length 3 :els ["1" "2" "3"]})
+  (def expect {:type "array" :count 3 :length 8 :els @["1" "2" "3"]})
   (is (== expect actual)))
 
 (deftest array-nested
   (def actual (util/to-inspectable @[@[1 2] @[3 4]]))
   (def expect {:type "array"
-               :length 2
-               :els [{:type "array" :length 2 :els ["1" "2"]}
-                     {:type "array" :length 2 :els ["3" "4"]}]})
+               :count 2
+               :length 16
+               :els @[{:type "array" :count 2 :length 6 :els @["1" "2"]}
+                      {:type "array" :count 2 :length 6 :els @["3" "4"]}]})
   (is (== expect actual)))
 
 # Tuples
 
 (deftest tuple-empty
   (def actual (util/to-inspectable []))
-  (def expect {:type "tuple" :length 0 :els []})
+  (def expect {:type "tuple" :count 0 :length 2 :els @[]})
   (is (== expect actual)))
 
 (deftest tuple-simple
   (def actual (util/to-inspectable [1 2 3]))
-  (def expect {:type "tuple" :length 3 :els ["1" "2" "3"]})
+  (def expect {:type "tuple" :count 3 :length 7 :els @["1" "2" "3"]})
   (is (== expect actual)))
 
 # Tables
 
 (deftest table-empty
   (def actual (util/to-inspectable @{}))
-  (def expect {:type "table" :length 0 :kvs []})
+  (def expect {:type "table" :count 0 :length 3 :kvs @[]})
   (is (== expect actual)))
 
 (deftest table-simple
   (def actual (util/to-inspectable @{:a 1 :b 2}))
   (is (= "table" (get actual :type)))
-  (is (= 2 (get actual :length)))
+  (is (= 2 (get actual :count)))
   (def kvs (get actual :kvs))
   (is (= 4 (length kvs)))
   # Check that both keys are present (order may vary)
@@ -89,13 +90,13 @@
 
 (deftest struct-empty
   (def actual (util/to-inspectable {}))
-  (def expect {:type "struct" :length 0 :kvs []})
+  (def expect {:type "struct" :count 0 :length 2 :kvs @[]})
   (is (== expect actual)))
 
 (deftest struct-simple
   (def actual (util/to-inspectable {:a 1 :b 2}))
   (is (= "struct" (get actual :type)))
-  (is (= 2 (get actual :length)))
+  (is (= 2 (get actual :count)))
   (def kvs (get actual :kvs))
   (is (= 4 (length kvs)))
   # Check that both keys are present (order may vary)
@@ -118,7 +119,7 @@
   (array/push arr arr)  # arr now contains itself
   (def actual (util/to-inspectable arr))
   (is (= "array" (get actual :type)))
-  (is (= 4 (get actual :length)))
+  (is (= 4 (get actual :count)))
   (def last-val (get-in actual [:els 3]))
   (is (== {:type "circular" :to "array"} last-val)))
 
@@ -127,7 +128,7 @@
   (put tbl :self tbl)  # tbl now contains itself
   (def actual (util/to-inspectable tbl))
   (is (= "table" (get actual :type)))
-  (is (= 3 (get actual :length)))
+  (is (= 3 (get actual :count)))
   # Find the :self value in the kvs array
   (def kvs (get actual :kvs))
   (def self-idx (find-index |(= ":self" $) kvs))
